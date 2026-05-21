@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Magellan: Backend + Client",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "core: build",
+      "program": "${workspaceFolder}/src/core/Magellan.Core/bin/Debug/net10.0/Magellan.Core.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/core/Magellan.Core",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5204"
+      },
+      "serverReadyAction": {
+        "action": "startDebugging",
+        "name": "Magellan: Client",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      }
+    },
+    {
+      "name": "Magellan: Client",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "preLaunchTask": "client: dev",
+      "url": "http://127.0.0.1:5173",
+      "webRoot": "${workspaceFolder}/src/client"
+    }
+  ]
+}

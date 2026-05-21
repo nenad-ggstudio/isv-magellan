@@ -1,0 +1,42 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "core: build",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/src/core/Magellan.Core/Magellan.Core.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "client: dev",
+      "type": "process",
+      "command": "npm",
+      "args": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "127.0.0.1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/src/client"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^> vite",
+          "endsPattern": "Local:\\s+http://127\\.0\\.0\\.1:5173/"
+        }
+      }
+    }
+  ]
+}
