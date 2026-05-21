@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/core/">
+    <Project Path="src/core/Magellan.Core/Magellan.Core.csproj" />
+  </Folder>
+</Solution>
