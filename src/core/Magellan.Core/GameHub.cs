@@ -1,3 +1,4 @@
+using Infrastructure;
 using Microsoft.AspNetCore.SignalR;
 
 public sealed class GameHub(GameEngine gameEngine) : Hub<IGameClient>

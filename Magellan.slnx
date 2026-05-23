@@ -3,4 +3,8 @@
   <Folder Name="/src/core/">
     <Project Path="src/core/Magellan.Core/Magellan.Core.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/core/">
+    <Project Path="tests/core/Magellan.Core.Tests/Magellan.Core.Tests.csproj" />
+  </Folder>
 </Solution>

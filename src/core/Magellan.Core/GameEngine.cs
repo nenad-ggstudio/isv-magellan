@@ -1,8 +1,9 @@
 using System.Collections.Concurrent;
-using Microsoft.AspNetCore.SignalR;
+using Events;
+using Infrastructure;
 
 public sealed class GameEngine(
-    IHubContext<GameHub, IGameClient> gameHub,
+    IGameEventBus gameEventBus,
     ILogger<GameEngine> logger) : BackgroundService
 {
     private static readonly TimeSpan TickRate = TimeSpan.FromMilliseconds(250);
@@ -45,13 +46,15 @@ public sealed class GameEngine(
 
             try
             {
-                await gameHub.Clients.Client(connectionId).GameTick(nextTick);
+                await gameEventBus.PublishAsync(
+                    new TickGameEvent(connectionId, nextTick),
+                    stoppingToken);
             }
             catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogWarning(
                     exception,
-                    "Unable to publish game tick to connection {ConnectionId}.",
+                    "Unable to publish game tick event for connection {ConnectionId}.",
                     connectionId);
             }
         }
