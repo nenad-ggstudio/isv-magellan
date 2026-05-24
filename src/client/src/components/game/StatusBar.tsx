@@ -1,18 +1,22 @@
+import type { ActiveGameState } from '../../gameTypes'
+
 type StatusBarProps = {
   connectionState: string
   elapsedMilliseconds: number
+  game: ActiveGameState
   tick: number
 }
 
 export function StatusBar({
   connectionState,
   elapsedMilliseconds,
+  game,
   tick,
 }: StatusBarProps) {
   return (
     <header className="status-bar">
       <div className="status-title">
-        <strong>Magellan Sector</strong>
+        <strong>{game.name}</strong>
         <span className="connection-state">
           {connectionState} / tick {tick} / {formatElapsed(elapsedMilliseconds)}
         </span>
@@ -20,15 +24,15 @@ export function StatusBar({
       <ul className="resource-list" aria-label="Resources">
         <li>
           <span>Water</span>
-          <strong>148</strong>
+          <strong>{game.resources.water}</strong>
         </li>
         <li>
           <span>Iron</span>
-          <strong>62</strong>
+          <strong>{game.resources.iron}</strong>
         </li>
         <li>
           <span>Power</span>
-          <strong>91%</strong>
+          <strong>{game.resources.power}%</strong>
         </li>
       </ul>
     </header>

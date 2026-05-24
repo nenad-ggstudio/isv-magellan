@@ -6,6 +6,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IGameEventStore, FileGameEventStore>();
 builder.Services.AddSingleton<IGameEventBus, GameEventBus>();
 builder.Services.AddSingleton<GameEngine>();
+builder.Services.AddSingleton<GameManager>();
 builder.Services.AddHostedService(serviceProvider =>
     serviceProvider.GetRequiredService<GameEngine>());
 builder.Services.AddHostedService<SignalREventRelay>();

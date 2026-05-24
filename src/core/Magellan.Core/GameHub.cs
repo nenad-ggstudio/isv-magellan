@@ -1,17 +1,27 @@
 using Infrastructure;
 using Microsoft.AspNetCore.SignalR;
 
-public sealed class GameHub(GameEngine gameEngine) : Hub<IGameClient>
+public sealed class GameHub(GameManager gameManager) : Hub<IGameClient>
 {
     public Task StartNewGame()
     {
-        gameEngine.StartNewGame(Context.ConnectionId);
-        return Task.CompletedTask;
+        return gameManager.StartNewGameAsync(Context.ConnectionId);
+    }
+
+    public Task GetGameState()
+    {
+        return gameManager.ConnectAsync(Context.ConnectionId);
+    }
+
+    public override async Task OnConnectedAsync()
+    {
+        await gameManager.ConnectAsync(Context.ConnectionId);
+        await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        gameEngine.StopGame(Context.ConnectionId);
+        gameManager.Disconnect(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
     }
 }

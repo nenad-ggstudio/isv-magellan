@@ -1,55 +1,23 @@
-import { useEffect, useState } from 'react'
-import {
-  HubConnectionBuilder,
-  HubConnectionState,
-  LogLevel,
-  type HubConnection,
-} from '@microsoft/signalr'
 import { ConsolePanel } from './game/ConsolePanel'
 import { LeftHud } from './game/LeftHud'
 import { MainArea } from './game/MainArea'
 import { RightHud } from './game/RightHud'
 import { StatusBar } from './game/StatusBar'
+import type { ActiveGameState, GameTick } from '../gameTypes'
 
-type GameTick = {
-  elapsedMilliseconds: number
-  tick: number
+type GamePageProps = {
+  connectionState: string
+  game: ActiveGameState
+  tick: GameTick
 }
 
-export function GamePage() {
-  const [connectionState, setConnectionState] = useState('Starting')
-  const [tick, setTick] = useState<GameTick>({
-    elapsedMilliseconds: 0,
-    tick: 0,
-  })
-
-  useEffect(() => {
-    const connection = new HubConnectionBuilder()
-      .withUrl('/hubs/game')
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build()
-
-    connection.on('GameTick', (nextTick: GameTick) => setTick(nextTick))
-    connection.onreconnecting(() => setConnectionState('Reconnecting'))
-    connection.onreconnected(() => {
-      setConnectionState('Connected')
-      void startGame(connection)
-    })
-    connection.onclose(() => setConnectionState('Disconnected'))
-
-    void startConnection(connection, setConnectionState)
-
-    return () => {
-      void connection.stop()
-    }
-  }, [])
-
+export function GamePage({ connectionState, game, tick }: GamePageProps) {
   return (
     <main className="game-page">
       <StatusBar
         connectionState={connectionState}
         elapsedMilliseconds={tick.elapsedMilliseconds}
+        game={game}
         tick={tick.tick}
       />
       <LeftHud />
@@ -58,23 +26,4 @@ export function GamePage() {
       <ConsolePanel tick={tick.tick} />
     </main>
   )
-}
-
-async function startConnection(
-  connection: HubConnection,
-  setConnectionState: (state: string) => void,
-) {
-  try {
-    await connection.start()
-    setConnectionState('Connected')
-    await startGame(connection)
-  } catch {
-    setConnectionState('Unavailable')
-  }
-}
-
-async function startGame(connection: HubConnection) {
-  if (connection.state === HubConnectionState.Connected) {
-    await connection.invoke('StartNewGame')
-  }
 }

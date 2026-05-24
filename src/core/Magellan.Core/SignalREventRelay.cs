@@ -28,7 +28,13 @@ public sealed class SignalREventRelay(
     {
         try
         {
-            if (envelope.Event is TickGameEvent gameTick)
+            if (envelope.Event is GameStateChangedGameEvent stateChanged)
+            {
+                await gameHub.Clients
+                    .Client(stateChanged.ConnectionId)
+                    .GameStateChanged(stateChanged.State);
+            }
+            else if (envelope.Event is TickGameEvent gameTick)
             {
                 await gameHub.Clients.Client(gameTick.ConnectionId).GameTick(gameTick.Tick);
             }

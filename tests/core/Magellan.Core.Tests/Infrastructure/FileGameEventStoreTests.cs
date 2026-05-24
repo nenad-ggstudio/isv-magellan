@@ -58,6 +58,26 @@ public sealed class FileGameEventStoreTests
     }
 
     [Fact]
+    public async Task AppendAsync_rehydrates_game_state_changed_events()
+    {
+        using var workspace = TestWorkspace.Create();
+        var state = GameState.NewGame(Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        using (var store = new FileGameEventStore(workspace.Environment))
+        {
+            await store.AppendAsync(new GameStateChangedGameEvent("connection-1", state));
+        }
+
+        using var reloadedStore = new FileGameEventStore(workspace.Environment);
+        var replayed = await ReadSingle(reloadedStore);
+        var replayedEvent = Assert.IsType<GameStateChangedGameEvent>(replayed.Event);
+
+        Assert.Equal("connection-1", replayedEvent.ConnectionId);
+        Assert.Equal(GameScreens.Game, replayedEvent.State.Screen);
+        Assert.Equal(state.Game, replayedEvent.State.Game);
+    }
+
+    [Fact]
     public async Task AppendAsync_continues_sequence_after_existing_tick_log()
     {
         using var workspace = TestWorkspace.Create();
