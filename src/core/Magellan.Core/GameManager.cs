@@ -4,7 +4,8 @@ using Infrastructure;
 
 public sealed class GameManager(
     IGameEventBus gameEventBus,
-    GameEngine gameEngine)
+    GameEngine gameEngine,
+    ILogger<GameManager> logger)
 {
     private readonly ConcurrentDictionary<string, GameState> states = new();
 
@@ -39,8 +40,15 @@ public sealed class GameManager(
         GameState state,
         CancellationToken cancellationToken)
     {
-        await gameEventBus.PublishAsync(
+        var envelope = await gameEventBus.PublishAsync(
             new GameStateChangedGameEvent(connectionId, state),
             cancellationToken);
+
+        logger.LogInformation(
+            "Game state changed for connection {ConnectionId}: {Screen} (GameId: {GameId}, Sequence: {Sequence}).",
+            connectionId,
+            state.Screen,
+            state.Game?.Id,
+            envelope.Sequence);
     }
 }

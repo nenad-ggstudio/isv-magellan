@@ -50,7 +50,7 @@ public sealed class GameManagerTests
         var bus = new GameEventBus(store);
         var gameEngine = new GameEngine(bus, NullLogger<GameEngine>.Instance);
 
-        return new GameManager(bus, gameEngine);
+        return new GameManager(bus, gameEngine, NullLogger<GameManager>.Instance);
     }
 
     private static async Task<GameEventEnvelope> ReadSingle(IGameEventStore store)
