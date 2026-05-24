@@ -4,17 +4,33 @@ using Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Magellan.Core.Tests.Infrastructure;
 
 public sealed class FileGameEventStoreTests
 {
     [Fact]
-    public async Task AppendAsync_writes_tick_events_to_minimal_tick_file_only()
+    public async Task AppendAsync_does_not_write_tick_events_by_default()
     {
         using var workspace = TestWorkspace.Create();
 
-        using (var store = new FileGameEventStore(workspace.Environment))
+        using (var store = CreateStore(workspace))
+        {
+            await store.AppendAsync(
+                new TickGameEvent("connection-1", new GameTick(250, 7)));
+        }
+
+        Assert.False(File.Exists(workspace.GameEventsPath));
+        Assert.False(File.Exists(workspace.TickEventsPath));
+    }
+
+    [Fact]
+    public async Task AppendAsync_writes_tick_events_to_minimal_tick_file_when_enabled()
+    {
+        using var workspace = TestWorkspace.Create();
+
+        using (var store = CreateStore(workspace, logTickEvents: true))
         {
             await store.AppendAsync(
                 new TickGameEvent("connection-1", new GameTick(250, 7)));
@@ -36,12 +52,12 @@ public sealed class FileGameEventStoreTests
     {
         using var workspace = TestWorkspace.Create();
 
-        using (var store = new FileGameEventStore(workspace.Environment))
+        using (var store = CreateStore(workspace))
         {
             await store.AppendAsync(new TestGameEvent("connection-1", "started"));
         }
 
-        Assert.Empty(File.ReadAllLines(workspace.TickEventsPath));
+        Assert.False(File.Exists(workspace.TickEventsPath));
 
         using var document = JsonDocument.Parse(File.ReadAllText(workspace.GameEventsPath));
         var persistedEvent = Assert.Single(document.RootElement.EnumerateArray());
@@ -49,7 +65,7 @@ public sealed class FileGameEventStoreTests
         Assert.Equal(typeof(TestGameEvent).FullName, persistedEvent.GetProperty("type").GetString());
         Assert.Equal("connection-1", persistedEvent.GetProperty("connectionId").GetString());
 
-        using var reloadedStore = new FileGameEventStore(workspace.Environment);
+        using var reloadedStore = CreateStore(workspace);
         var replayed = await ReadSingle(reloadedStore);
         var replayedEvent = Assert.IsType<TestGameEvent>(replayed.Event);
 
@@ -63,12 +79,12 @@ public sealed class FileGameEventStoreTests
         using var workspace = TestWorkspace.Create();
         var state = GameState.NewGame(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
-        using (var store = new FileGameEventStore(workspace.Environment))
+        using (var store = CreateStore(workspace))
         {
             await store.AppendAsync(new GameStateChangedGameEvent("connection-1", state));
         }
 
-        using var reloadedStore = new FileGameEventStore(workspace.Environment);
+        using var reloadedStore = CreateStore(workspace);
         var replayed = await ReadSingle(reloadedStore);
         var replayedEvent = Assert.IsType<GameStateChangedGameEvent>(replayed.Event);
 
@@ -82,17 +98,30 @@ public sealed class FileGameEventStoreTests
     {
         using var workspace = TestWorkspace.Create();
 
-        using (var store = new FileGameEventStore(workspace.Environment))
+        using (var store = CreateStore(workspace, logTickEvents: true))
         {
             await store.AppendAsync(
                 new TickGameEvent("connection-1", new GameTick(250, 1)));
         }
 
-        using var reloadedStore = new FileGameEventStore(workspace.Environment);
+        using var reloadedStore = CreateStore(workspace);
         var gameEvent = await reloadedStore.AppendAsync(
             new TestGameEvent("connection-1", "started"));
 
         Assert.Equal(2, gameEvent.Sequence);
+    }
+
+    private static FileGameEventStore CreateStore(
+        TestWorkspace workspace,
+        bool logTickEvents = false)
+    {
+        return new FileGameEventStore(
+            workspace.Environment,
+            Options.Create(
+                new GameEventStoreOptions
+                {
+                    LogTickEvents = logTickEvents
+                }));
     }
 
     private static async Task<GameEventEnvelope> ReadSingle(IGameEventStore store)

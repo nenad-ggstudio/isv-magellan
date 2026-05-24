@@ -1,22 +1,22 @@
-import type { ActiveGameState } from '../../gameTypes'
+import type { ActiveGameState } from '../../../gameTypes'
 
-type StatusBarProps = {
+type HeaderProps = {
   connectionState: string
   elapsedMilliseconds: number
   game: ActiveGameState
   tick: number
 }
 
-export function StatusBar({
+export function Header({
   connectionState,
   elapsedMilliseconds,
   game,
   tick,
-}: StatusBarProps) {
+}: HeaderProps) {
   return (
-    <header className="status-bar">
-      <div className="status-title">
-        <strong>{game.name}</strong>
+    <header className="game-header">
+      <div className="header-title">
+        <h1>{game.name}</h1>
         <span className="connection-state">
           {connectionState} / tick {tick} / {formatElapsed(elapsedMilliseconds)}
         </span>

@@ -1,12 +1,12 @@
-type ConsolePanelProps = {
+type ConsoleProps = {
   tick: number
 }
 
-export function ConsolePanel({ tick }: ConsolePanelProps) {
+export function Console({ tick }: ConsoleProps) {
   return (
-    <section className="console-panel" aria-label="Game console">
+    <section className="console" aria-label="Game console">
       <div>
-        <span className="hud-label">Log</span>
+        <span className="panel-label">Log</span>
         <h2>Console</h2>
       </div>
       <div className="console-stream">

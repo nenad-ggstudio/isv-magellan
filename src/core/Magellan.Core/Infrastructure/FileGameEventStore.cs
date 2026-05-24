@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Events;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure;
 
@@ -17,13 +18,18 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
     private readonly List<GameEventEnvelope> events = [];
     private readonly List<PersistedGameEvent> persistedGameEvents = [];
     private readonly string gameEventsPath;
-    private readonly StreamWriter tickWriter;
+    private readonly bool logTickEvents;
+    private readonly StreamWriter? tickWriter;
     private long sequence;
 
     public long CurrentSequence => Interlocked.Read(ref sequence);
 
-    public FileGameEventStore(IWebHostEnvironment environment)
+    public FileGameEventStore(
+        IWebHostEnvironment environment,
+        IOptions<GameEventStoreOptions> options)
     {
+        logTickEvents = options.Value.LogTickEvents;
+
         var dataDirectory = Path.Combine(environment.ContentRootPath, "App_Data");
         Directory.CreateDirectory(dataDirectory);
 
@@ -33,14 +39,17 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
         LoadExistingGameEvents(gameEventsPath);
         LoadTickSequence(tickEventsPath);
 
-        tickWriter = new StreamWriter(
-            new FileStream(
-                tickEventsPath,
-                FileMode.Append,
-                FileAccess.Write,
-                FileShare.Read,
-                bufferSize: 64 * 1024,
-                FileOptions.Asynchronous));
+        if (logTickEvents)
+        {
+            tickWriter = new StreamWriter(
+                new FileStream(
+                    tickEventsPath,
+                    FileMode.Append,
+                    FileAccess.Write,
+                    FileShare.Read,
+                    bufferSize: 64 * 1024,
+                    FileOptions.Asynchronous));
+        }
     }
 
     public async ValueTask<GameEventEnvelope> AppendAsync(
@@ -107,7 +116,7 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
 
     public void Dispose()
     {
-        tickWriter.Dispose();
+        tickWriter?.Dispose();
         appendGate.Dispose();
     }
 
@@ -139,6 +148,11 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
         TickGameEvent tickGameEvent,
         CancellationToken cancellationToken)
     {
+        if (!logTickEvents || tickWriter is null)
+        {
+            return;
+        }
+
         var line = string.Create(
             CultureInfo.InvariantCulture,
             $"{envelope.Sequence}\t{envelope.OccurredAt.ToUnixTimeMilliseconds()}\t{tickGameEvent.ConnectionId}\t{tickGameEvent.Tick.ElapsedMilliseconds}\t{tickGameEvent.Tick.Tick}");

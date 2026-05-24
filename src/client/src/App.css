@@ -37,9 +37,9 @@
 .game-page {
   display: grid;
   grid-template:
-    'status status status' 72px
-    'left main right' minmax(0, 1fr)
-    'console console console' minmax(170px, 25svh) / minmax(180px, 238px)
+    'header header header' 72px
+    'crew navigation ship' minmax(0, 1fr)
+    'crew console ship' minmax(170px, 25svh) / minmax(180px, 238px)
     minmax(0, 1fr) minmax(180px, 238px);
   min-height: 100svh;
   background:
@@ -48,15 +48,15 @@
   color: #d8e0df;
 }
 
-.status-bar,
-.side-hud,
-.console-panel {
+.game-header,
+.side-panel,
+.console {
   border-color: #20292b;
   background: rgb(8 11 12 / 92%);
 }
 
-.status-bar {
-  grid-area: status;
+.game-header {
+  grid-area: header;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -65,16 +65,19 @@
   padding: 0 24px;
 }
 
-.status-title {
+.header-title {
   display: grid;
   gap: 3px;
   min-width: 0;
   text-align: left;
 }
 
-.status-title strong {
+.header-title h1 {
+  margin: 0;
   color: #f5fbfa;
   font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .connection-state {
@@ -104,7 +107,7 @@
 }
 
 .resource-list span,
-.hud-label {
+.panel-label {
   color: #769293;
   font-size: 11px;
   text-transform: uppercase;
@@ -114,40 +117,43 @@
   font-size: 17px;
 }
 
-.left-hud {
-  grid-area: left;
+.crew-hub {
+  grid-area: crew;
   border-right: 1px solid #20292b;
 }
 
-.right-hud {
-  grid-area: right;
+.ship-status {
+  grid-area: ship;
   border-left: 1px solid #20292b;
 }
 
-.side-hud {
+.side-panel {
   display: grid;
   align-content: start;
   gap: 16px;
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
   padding: 22px 18px;
   text-align: left;
 }
 
-.side-hud h2,
-.console-panel h2 {
+.side-panel h2,
+.console h2,
+.navigation-placeholder h2 {
   margin: 4px 0 0;
   color: #f2f7f6;
   font-size: 17px;
   font-weight: 600;
 }
 
-.hud-readout {
+.panel-readout {
   display: grid;
   gap: 7px;
   margin: 0;
 }
 
-.hud-readout div {
+.panel-readout div {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -155,23 +161,24 @@
   padding-bottom: 8px;
 }
 
-.hud-readout dt {
+.panel-readout dt {
   color: #91aaaa;
 }
 
-.hud-readout dd {
+.panel-readout dd {
   margin: 0;
   color: #e1e8e7;
 }
 
-.main-area {
-  grid-area: main;
+.navigation-panel {
+  grid-area: navigation;
   position: relative;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
-.main-area::before {
+.navigation-panel::before {
   position: absolute;
   inset: 0;
   background-image:
@@ -182,17 +189,26 @@
   mask-image: radial-gradient(circle, black 15%, transparent 78%);
 }
 
-.empty-sector {
+.navigation-placeholder {
   position: absolute;
   inset: 0;
   display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
   place-items: center;
+  color: #557171;
+  text-align: center;
+}
+
+.navigation-placeholder p {
+  margin: 0;
   color: #3e5455;
   font-size: 13px;
   text-transform: uppercase;
 }
 
-.console-panel {
+.console {
   grid-area: console;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -223,14 +239,14 @@
 @media (max-width: 800px) {
   .game-page {
     grid-template:
-      'status' auto
-      'main' minmax(280px, 1fr)
-      'left' auto
-      'right' auto
+      'header' auto
+      'navigation' minmax(280px, 1fr)
+      'crew' auto
+      'ship' auto
       'console' minmax(180px, 28svh);
   }
 
-  .status-bar {
+  .game-header {
     align-items: stretch;
     flex-direction: column;
     padding: 16px;
@@ -245,13 +261,13 @@
     min-width: 0;
   }
 
-  .left-hud,
-  .right-hud {
+  .crew-hub,
+  .ship-status {
     border-inline: 0;
     border-top: 1px solid #20292b;
   }
 
-  .console-panel {
+  .console {
     padding-inline: 16px;
   }
 }

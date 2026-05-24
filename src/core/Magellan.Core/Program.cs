@@ -34,6 +34,8 @@ try
     {
         options.AddFilter(typeof(ClientHubLoggingFilter));
     });
+    builder.Services.Configure<GameEventStoreOptions>(
+        builder.Configuration.GetSection(GameEventStoreOptions.SectionName));
     builder.Services.AddSingleton<IGameEventStore, FileGameEventStore>();
     builder.Services.AddSingleton<IGameEventBus, GameEventBus>();
     builder.Services.AddSingleton<GameEngine>();
