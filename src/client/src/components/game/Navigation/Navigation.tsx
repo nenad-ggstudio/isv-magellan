@@ -82,7 +82,7 @@ export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
                   />
                   <div>
                     <strong>{contact.name}</strong>
-                    <span>{contact.classification}</span>
+                    <span>{contact.asteroidTypeLabel}</span>
                   </div>
                   <dl>
                     <div>
@@ -94,6 +94,16 @@ export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
                       <dd>{formatSignalAge(contact.signalAgeSeconds)}</dd>
                     </div>
                   </dl>
+                  {contact.resourceEstimates.length > 0 && (
+                    <ul className="resource-estimates">
+                      {contact.resourceEstimates.map((estimate) => (
+                        <li key={estimate.resource}>
+                          <span>{formatResourceName(estimate.resource)}</span>
+                          <strong>{formatResourceEstimate(estimate)}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ol>
@@ -178,6 +188,22 @@ function formatSignalAge(seconds: number) {
   }
 
   return `${Math.max(1, Math.round(seconds * 1000))} ms ago`
+}
+
+function formatResourceEstimate({
+  label,
+  maximum,
+  minimum,
+}: SensorContact['resourceEstimates'][number]) {
+  if (minimum === 0 && maximum === 0) {
+    return 'none'
+  }
+
+  return `${label} ${Math.round(minimum * 100)}-${Math.round(maximum * 100)}%`
+}
+
+function formatResourceName(resource: string) {
+  return resource.charAt(0).toUpperCase() + resource.slice(1)
 }
 
 function formatElapsed(elapsedMilliseconds: number) {

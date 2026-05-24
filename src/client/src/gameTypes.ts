@@ -8,22 +8,36 @@ export type GameStateAction = {
   label: string
 }
 
+export type GameResource = {
+  contaminationLevel: number
+}
+
 export type GameResources = {
-  water: number
-  iron: number
-  power: number
+  water: GameResource
+  lithium: GameResource
+  carbon: GameResource
+}
+
+export type ResourceName = 'water' | 'lithium' | 'carbon'
+
+export type StoredResource = {
+  resource: ResourceName
+  quantityKilograms: number
+  purityLevel: number
+}
+
+export type StorageUnit = {
+  slotNumber: number
+  capacityKilograms: number
+  contents: StoredResource | null
+}
+
+export type Ship = {
+  name: string
+  storageUnits: StorageUnit[]
 }
 
 export type DistanceUnit = 'lightYear' | 'kilometer'
-
-export type SensorContactKind =
-  | 'asteroid'
-  | 'comet'
-  | 'debris'
-  | 'largeAsteroid'
-  | 'nebula'
-  | 'planetoid'
-  | 'star'
 
 export type WorldPosition = {
   label: string
@@ -32,16 +46,25 @@ export type WorldPosition = {
   unit: DistanceUnit
 }
 
+export type ResourceEstimate = {
+  resource: ResourceName
+  minimum: number
+  maximum: number
+  label: string
+}
+
 export type SensorContact = {
   id: string
   name: string
-  kind: SensorContactKind
+  kind: 'asteroid'
+  asteroidTypeId: 'c-type' | 's-type' | 'm-type'
+  asteroidTypeLabel: string
   x: number
   y: number
   distance: number
   signalAgeSeconds: number
-  classification: string
   markerScale: number
+  resourceEstimates: ResourceEstimate[]
 }
 
 export type SensorScan = {
@@ -65,6 +88,7 @@ export type ActiveGameState = {
   startedAt: string
   resources: GameResources
   world: GameWorld
+  ship: Ship
 }
 
 export type GameState = {

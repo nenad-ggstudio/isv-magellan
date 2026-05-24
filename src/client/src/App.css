@@ -170,6 +170,133 @@
   color: #e1e8e7;
 }
 
+.cargo-hold {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #243033;
+  border-radius: 6px;
+  background: rgb(3 6 7 / 62%);
+  padding: 0;
+}
+
+.cargo-hold summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 0 12px;
+  color: #f2f7f6;
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+}
+
+.cargo-hold summary::-webkit-details-marker {
+  display: none;
+}
+
+.cargo-hold summary::after {
+  color: #7f999a;
+  content: '+';
+  font-size: 16px;
+  line-height: 1;
+}
+
+.cargo-hold[open] summary::after {
+  content: '-';
+}
+
+.cargo-hold summary strong {
+  color: #91aaaa;
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.cargo-overview {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #1d282a;
+  padding: 11px 12px 0;
+}
+
+.cargo-overview span,
+.storage-unit-row dt {
+  color: #7f999a;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.cargo-overview strong {
+  color: #dce7e5;
+  font-size: 12px;
+}
+
+.storage-unit-list {
+  display: grid;
+  gap: 8px;
+  max-height: 440px;
+  overflow: auto;
+  margin: 0;
+  padding: 0 12px 12px;
+  list-style: none;
+}
+
+.storage-unit-row {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #1d282a;
+  border-radius: 6px;
+  background: #060909;
+  padding: 9px;
+}
+
+.storage-unit-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.storage-unit-row > div:first-child span {
+  color: #7f999a;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.storage-unit-row > div:first-child strong {
+  color: #f2f7f6;
+  font-size: 12px;
+}
+
+.storage-meter {
+  overflow: hidden;
+  height: 5px;
+  border-radius: 999px;
+  background: #172021;
+}
+
+.storage-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #84cdb8;
+}
+
+.storage-unit-row dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.storage-unit-row dd {
+  margin: 1px 0 0;
+  color: #dce7e5;
+  font-size: 12px;
+}
+
 .navigation-panel {
   grid-area: navigation;
   position: relative;
@@ -297,8 +424,9 @@
   stroke-width: 1;
 }
 
-.sensor-contact {
-  color: #9fb8ba;
+.sensor-contact,
+.contact-token {
+  color: #b9c0b6;
 }
 
 .sensor-contact circle:first-child {
@@ -314,39 +442,9 @@
   stroke-width: 0.45;
 }
 
-.sensor-contact[data-kind='star'],
-.contact-token[data-kind='star'] {
-  color: #f3c75f;
-}
-
-.sensor-contact[data-kind='planetoid'],
-.contact-token[data-kind='planetoid'] {
-  color: #9cc6e8;
-}
-
-.sensor-contact[data-kind='nebula'],
-.contact-token[data-kind='nebula'] {
-  color: #d48ee6;
-}
-
-.sensor-contact[data-kind='largeAsteroid'],
-.contact-token[data-kind='largeAsteroid'] {
-  color: #c6b08a;
-}
-
 .sensor-contact[data-kind='asteroid'],
 .contact-token[data-kind='asteroid'] {
   color: #b9c0b6;
-}
-
-.sensor-contact[data-kind='comet'],
-.contact-token[data-kind='comet'] {
-  color: #77d6ef;
-}
-
-.sensor-contact[data-kind='debris'],
-.contact-token[data-kind='debris'] {
-  color: #ef8b73;
 }
 
 .scan-readout {
@@ -460,6 +558,42 @@
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.resource-estimates {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resource-estimates li {
+  min-width: 0;
+  border-top: 1px solid #1d282a;
+  padding-top: 7px;
+}
+
+.resource-estimates span,
+.resource-estimates strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resource-estimates span {
+  color: #7f999a;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.resource-estimates strong {
+  color: #dce7e5;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .console {

@@ -4,9 +4,11 @@ public sealed record SensorContact(
     string Id,
     string Name,
     string Kind,
+    string AsteroidTypeId,
+    string AsteroidTypeLabel,
     double X,
     double Y,
     double Distance,
     double SignalAgeSeconds,
-    string Classification,
-    double MarkerScale);
+    double MarkerScale,
+    IReadOnlyList<ResourceEstimate> ResourceEstimates);

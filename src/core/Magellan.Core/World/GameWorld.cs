@@ -1,3 +1,5 @@
+using World.SpaceObjects.Asteroids;
+
 namespace World;
 
 public sealed record GameWorld(
@@ -20,46 +22,46 @@ public sealed record GameWorld(
                 4,
                 DistanceUnits.LightYear,
                 [
-                    LongRangeContact(
+                    LongRangeContact(new Asteroid(
                         "lr-morrow-star",
                         "Morrow Star",
-                        SensorContactKinds.Star,
                         1.12,
                         -0.42,
-                        "K-type main sequence star",
-                        1.5),
-                    LongRangeContact(
+                        DistanceUnits.LightYear,
+                        1.08,
+                        AsteroidTypes.CType)),
+                    LongRangeContact(new Asteroid(
                         "lr-vela-minor",
                         "Vela Minor",
-                        SensorContactKinds.Planetoid,
                         -0.86,
                         1.92,
-                        "cold planetoid",
-                        1.1),
-                    LongRangeContact(
-                        "lr-nacre-cloud",
-                        "Nacre Cloud",
-                        SensorContactKinds.Nebula,
+                        DistanceUnits.LightYear,
+                        0.92,
+                        AsteroidTypes.SType)),
+                    LongRangeContact(new Asteroid(
+                        "lr-nacre-cluster",
+                        "Nacre Cluster",
                         2.54,
                         1.36,
-                        "diffuse ionized gas",
-                        1.35),
-                    LongRangeContact(
+                        DistanceUnits.LightYear,
+                        1.2,
+                        AsteroidTypes.CType)),
+                    LongRangeContact(new Asteroid(
                         "lr-kepler-fragment",
                         "Kepler Fragment",
-                        SensorContactKinds.LargeAsteroid,
                         0.44,
                         3.18,
-                        "large metallic asteroid",
-                        0.82),
-                    LongRangeContact(
-                        "lr-sable-comet",
-                        "Sable Comet",
-                        SensorContactKinds.Comet,
+                        DistanceUnits.LightYear,
+                        0.82,
+                        AsteroidTypes.MType)),
+                    LongRangeContact(new Asteroid(
+                        "lr-sable-stone",
+                        "Sable Stone",
                         -2.72,
                         -1.18,
-                        "active long-period comet",
-                        0.72)
+                        DistanceUnits.LightYear,
+                        0.72,
+                        AsteroidTypes.SType))
                 ]),
             new SensorScan(
                 "local-sector",
@@ -67,85 +69,75 @@ public sealed record GameWorld(
                 8_000,
                 DistanceUnits.Kilometer,
                 [
-                    LocalContact(
+                    LocalContact(new Asteroid(
                         "local-kite-rock",
                         "Kite Rock",
-                        SensorContactKinds.Asteroid,
                         1_180,
                         -940,
-                        "tumbling carbonaceous rock",
-                        0.72),
-                    LocalContact(
+                        DistanceUnits.Kilometer,
+                        0.72,
+                        AsteroidTypes.CType)),
+                    LocalContact(new Asteroid(
                         "local-ice-shard",
                         "Ice Shard",
-                        SensorContactKinds.Asteroid,
                         5_240,
                         690,
-                        "volatile-rich fragment",
-                        0.48),
-                    LocalContact(
-                        "local-dust-lane",
-                        "Dust Lane",
-                        SensorContactKinds.Debris,
+                        DistanceUnits.Kilometer,
+                        0.48,
+                        AsteroidTypes.SType)),
+                    LocalContact(new Asteroid(
+                        "local-dust-stone",
+                        "Dust Stone",
                         -3_620,
                         2_180,
-                        "loose particulate field",
-                        0.92),
-                    LocalContact(
-                        "local-silent-probe",
-                        "Silent Probe",
-                        SensorContactKinds.Debris,
+                        DistanceUnits.Kilometer,
+                        0.92,
+                        AsteroidTypes.MType)),
+                    LocalContact(new Asteroid(
+                        "local-silent-core",
+                        "Silent Core",
                         820,
                         4_360,
-                        "inactive manufactured object",
-                        0.56)
+                        DistanceUnits.Kilometer,
+                        0.56,
+                        AsteroidTypes.MType))
                 ]));
     }
 
-    private static SensorContact LongRangeContact(
-        string id,
-        string name,
-        string kind,
-        double x,
-        double y,
-        string classification,
-        double markerScale)
+    private static SensorContact LongRangeContact(Asteroid asteroid)
     {
-        var distance = DistanceFromOrigin(x, y);
+        var distance = DistanceFromOrigin(asteroid.X, asteroid.Y);
 
         return new SensorContact(
-            id,
-            name,
-            kind,
-            x,
-            y,
+            asteroid.Id,
+            asteroid.Name,
+            asteroid.Kind,
+            asteroid.Type.Id,
+            asteroid.Type.Label,
+            asteroid.X,
+            asteroid.Y,
             distance,
             distance * SecondsPerLightYear,
-            classification,
-            markerScale);
+            asteroid.MarkerScale,
+            []);
     }
 
-    private static SensorContact LocalContact(
-        string id,
-        string name,
-        string kind,
-        double x,
-        double y,
-        string classification,
-        double markerScale)
+    private static SensorContact LocalContact(Asteroid asteroid)
     {
-        var distance = DistanceFromOrigin(x, y);
+        var distance = DistanceFromOrigin(asteroid.X, asteroid.Y);
 
         return new SensorContact(
-            id,
-            name,
-            kind,
-            x,
-            y,
+            asteroid.Id,
+            asteroid.Name,
+            asteroid.Kind,
+            asteroid.Type.Id,
+            asteroid.Type.Label,
+            asteroid.X,
+            asteroid.Y,
             distance,
             distance / LightSpeedKilometersPerSecond,
-            classification,
-            markerScale);
+            asteroid.MarkerScale,
+            asteroid.Type.Resources.Estimates);
     }
 
     private static double DistanceFromOrigin(double x, double y)

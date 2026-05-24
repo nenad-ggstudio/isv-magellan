@@ -1,4 +1,5 @@
 using World;
+using PlayerShip = Ship.Ship;
 
 namespace Infrastructure;
 
@@ -25,10 +26,11 @@ public sealed record GameState(
                 "Magellan Sector",
                 startedAt,
                 new GameResources(
-                    Water: 148,
-                    Iron: 62,
-                    Power: 91),
-                GameWorld.StartingWorld(startedAt)));
+                    new GameResource(0.04),
+                    new GameResource(0.02),
+                    new GameResource(0.01)),
+                GameWorld.StartingWorld(startedAt),
+                PlayerShip.StartingShip()));
     }
 }
 
@@ -39,9 +41,15 @@ public sealed record ActiveGameState(
     string Name,
     DateTimeOffset StartedAt,
     GameResources Resources,
-    GameWorld World);
+    GameWorld World,
+    PlayerShip Ship);
 
-public sealed record GameResources(int Water, int Iron, int Power);
+public sealed record GameResources(
+    GameResource Water,
+    GameResource Lithium,
+    GameResource Carbon);
+
+public sealed record GameResource(double ContaminationLevel);
 
 public static class GameScreens
 {

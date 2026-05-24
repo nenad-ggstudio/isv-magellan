@@ -98,6 +98,13 @@ public sealed class FileGameEventStoreTests
         Assert.Equal(expectedGame.Name, actualGame.Name);
         Assert.Equal(expectedGame.StartedAt, actualGame.StartedAt);
         Assert.Equal(expectedGame.Resources, actualGame.Resources);
+        Assert.Equal(expectedGame.Ship.Name, actualGame.Ship.Name);
+        Assert.Equal(
+            expectedGame.Ship.StorageUnits.Select(unit => unit.SlotNumber),
+            actualGame.Ship.StorageUnits.Select(unit => unit.SlotNumber));
+        Assert.Equal(
+            expectedGame.Ship.StorageUnits.Select(unit => unit.Contents?.Resource),
+            actualGame.Ship.StorageUnits.Select(unit => unit.Contents?.Resource));
         Assert.Equal(expectedGame.World.ShipPosition, actualGame.World.ShipPosition);
         Assert.Equal(
             expectedGame.World.LongRangeScan.Contacts.Select(contact => contact.Id),

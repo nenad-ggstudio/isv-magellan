@@ -24,19 +24,23 @@ export function Header({
       <ul className="resource-list" aria-label="Resources">
         <li>
           <span>Water</span>
-          <strong>{game.resources.water}</strong>
+          <strong>{formatContamination(game.resources.water.contaminationLevel)}</strong>
         </li>
         <li>
-          <span>Iron</span>
-          <strong>{game.resources.iron}</strong>
+          <span>Lithium</span>
+          <strong>{formatContamination(game.resources.lithium.contaminationLevel)}</strong>
         </li>
         <li>
-          <span>Power</span>
-          <strong>{game.resources.power}%</strong>
+          <span>Carbon</span>
+          <strong>{formatContamination(game.resources.carbon.contaminationLevel)}</strong>
         </li>
       </ul>
     </header>
   )
+}
+
+function formatContamination(contaminationLevel: number) {
+  return `${Math.round(contaminationLevel * 100)}%`
 }
 
 function formatElapsed(milliseconds: number) {
