@@ -21,7 +21,10 @@ export function GamePage({ connectionState, game, tick }: GamePageProps) {
         tick={tick.tick}
       />
       <CrewHub />
-      <Navigation />
+      <Navigation
+        elapsedMilliseconds={tick.elapsedMilliseconds}
+        world={game.world}
+      />
       <ShipStatus />
       <Console tick={tick.tick} />
     </main>

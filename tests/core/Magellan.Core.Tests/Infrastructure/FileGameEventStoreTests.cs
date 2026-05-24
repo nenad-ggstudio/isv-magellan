@@ -90,7 +90,21 @@ public sealed class FileGameEventStoreTests
 
         Assert.Equal("connection-1", replayedEvent.ConnectionId);
         Assert.Equal(GameScreens.Game, replayedEvent.State.Screen);
-        Assert.Equal(state.Game, replayedEvent.State.Game);
+
+        var expectedGame = Assert.IsType<ActiveGameState>(state.Game);
+        var actualGame = Assert.IsType<ActiveGameState>(replayedEvent.State.Game);
+
+        Assert.Equal(expectedGame.Id, actualGame.Id);
+        Assert.Equal(expectedGame.Name, actualGame.Name);
+        Assert.Equal(expectedGame.StartedAt, actualGame.StartedAt);
+        Assert.Equal(expectedGame.Resources, actualGame.Resources);
+        Assert.Equal(expectedGame.World.ShipPosition, actualGame.World.ShipPosition);
+        Assert.Equal(
+            expectedGame.World.LongRangeScan.Contacts.Select(contact => contact.Id),
+            actualGame.World.LongRangeScan.Contacts.Select(contact => contact.Id));
+        Assert.Equal(
+            expectedGame.World.LocalSectorScan.Contacts.Select(contact => contact.Id),
+            actualGame.World.LocalSectorScan.Contacts.Select(contact => contact.Id));
     }
 
     [Fact]

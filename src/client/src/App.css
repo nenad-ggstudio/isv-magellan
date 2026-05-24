@@ -140,7 +140,7 @@
 
 .side-panel h2,
 .console h2,
-.navigation-placeholder h2 {
+.navigation-header h2 {
   margin: 4px 0 0;
   color: #f2f7f6;
   font-size: 17px;
@@ -187,25 +187,279 @@
   background-size: 48px 48px;
   content: '';
   mask-image: radial-gradient(circle, black 15%, transparent 78%);
+  pointer-events: none;
 }
 
-.navigation-placeholder {
+.navigation-shell {
   position: absolute;
   inset: 0;
   display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 4px;
-  place-items: center;
-  color: #557171;
-  text-align: center;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 18px;
+  min-width: 0;
+  min-height: 0;
+  padding: 22px 24px;
 }
 
-.navigation-placeholder p {
-  margin: 0;
-  color: #3e5455;
-  font-size: 13px;
+.navigation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  text-align: left;
+}
+
+.scan-tabs {
+  display: inline-flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid #2a3638;
+  border-radius: 6px;
+  background: #060909;
+}
+
+.scan-tab {
+  min-width: 104px;
+  min-height: 34px;
+  border: 0;
+  border-right: 1px solid #2a3638;
+  background: transparent;
+  color: #8ea6a7;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
   text-transform: uppercase;
+}
+
+.scan-tab:last-child {
+  border-right: 0;
+}
+
+.scan-tab[aria-selected='true'] {
+  background: #d7ece5;
+  color: #071011;
+}
+
+.scan-tab:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #f4f7f7;
+  outline-offset: -2px;
+}
+
+.navigation-content {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(230px, 300px);
+  gap: 18px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sensor-map {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sensor-map svg {
+  display: block;
+  width: min(100%, 620px);
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 1;
+  filter: drop-shadow(0 0 24px rgb(92 162 155 / 16%));
+}
+
+.sensor-range,
+.sensor-axis {
+  fill: none;
+  stroke: rgb(129 165 161 / 25%);
+  stroke-width: 0.38;
+}
+
+.sensor-range--outer {
+  stroke: rgb(179 219 211 / 55%);
+  stroke-width: 0.55;
+}
+
+.sensor-axis {
+  stroke-dasharray: 1.5 2;
+}
+
+.ship-marker {
+  fill: #f4f7f7;
+  stroke: #55d6c2;
+  stroke-width: 1;
+}
+
+.sensor-contact {
+  color: #9fb8ba;
+}
+
+.sensor-contact circle:first-child {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.65;
+  opacity: 0.28;
+}
+
+.sensor-contact circle:last-child {
+  fill: currentColor;
+  stroke: #021010;
+  stroke-width: 0.45;
+}
+
+.sensor-contact[data-kind='star'],
+.contact-token[data-kind='star'] {
+  color: #f3c75f;
+}
+
+.sensor-contact[data-kind='planetoid'],
+.contact-token[data-kind='planetoid'] {
+  color: #9cc6e8;
+}
+
+.sensor-contact[data-kind='nebula'],
+.contact-token[data-kind='nebula'] {
+  color: #d48ee6;
+}
+
+.sensor-contact[data-kind='largeAsteroid'],
+.contact-token[data-kind='largeAsteroid'] {
+  color: #c6b08a;
+}
+
+.sensor-contact[data-kind='asteroid'],
+.contact-token[data-kind='asteroid'] {
+  color: #b9c0b6;
+}
+
+.sensor-contact[data-kind='comet'],
+.contact-token[data-kind='comet'] {
+  color: #77d6ef;
+}
+
+.sensor-contact[data-kind='debris'],
+.contact-token[data-kind='debris'] {
+  color: #ef8b73;
+}
+
+.scan-readout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.scan-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.scan-summary div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid #243033;
+  border-radius: 6px;
+  background: rgb(3 6 7 / 72%);
+  padding: 8px;
+  text-align: left;
+}
+
+.scan-summary span,
+.contact-row dt {
+  color: #7f999a;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.scan-summary strong {
+  overflow: hidden;
+  color: #eef6f4;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-list {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 0 4px 0 0;
+  list-style: none;
+}
+
+.contact-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px 10px;
+  border: 1px solid #1d282a;
+  border-radius: 6px;
+  background: rgb(4 8 9 / 76%);
+  padding: 10px;
+  text-align: left;
+}
+
+.contact-token {
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+}
+
+.contact-row strong,
+.contact-row span {
+  display: block;
+  min-width: 0;
+}
+
+.contact-row strong {
+  overflow: hidden;
+  color: #f2f7f6;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-row span {
+  margin-top: 2px;
+  color: #91aaaa;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.contact-row dl {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.contact-row dl div {
+  min-width: 0;
+}
+
+.contact-row dd {
+  margin: 1px 0 0;
+  overflow: hidden;
+  color: #dce7e5;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .console {
@@ -240,7 +494,7 @@
   .game-page {
     grid-template:
       'header' auto
-      'navigation' minmax(280px, 1fr)
+      'navigation' minmax(620px, 1fr)
       'crew' auto
       'ship' auto
       'console' minmax(180px, 28svh);
@@ -269,5 +523,38 @@
 
   .console {
     padding-inline: 16px;
+  }
+
+  .navigation-shell {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .navigation-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .scan-tabs {
+    width: 100%;
+  }
+
+  .scan-tab {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .navigation-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 0.9fr) minmax(230px, 1fr);
+    gap: 14px;
+  }
+
+  .sensor-map svg {
+    width: min(100%, 360px);
+  }
+
+  .scan-readout {
+    min-height: 0;
   }
 }

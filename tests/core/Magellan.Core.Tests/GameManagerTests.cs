@@ -1,6 +1,7 @@
 using Events;
 using Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
+using World;
 
 namespace Magellan.Core.Tests;
 
@@ -43,6 +44,36 @@ public sealed class GameManagerTests
         Assert.NotNull(activeGame);
         Assert.Equal("Magellan Sector", activeGame!.Name);
         Assert.Equal(new GameResources(148, 62, 91), activeGame.Resources);
+
+        var world = activeGame.World;
+
+        Assert.Equal("Ship Origin", world.ShipPosition.Label);
+        Assert.Equal(DistanceUnits.Kilometer, world.ShipPosition.Unit);
+        Assert.Equal(activeGame.StartedAt, world.CurrentTime);
+
+        Assert.Equal("long-range", world.LongRangeScan.Id);
+        Assert.Equal(DistanceUnits.LightYear, world.LongRangeScan.DistanceUnit);
+        Assert.Equal(4, world.LongRangeScan.Radius);
+        Assert.Equal(5, world.LongRangeScan.Contacts.Count);
+        Assert.Contains(
+            world.LongRangeScan.Contacts,
+            contact =>
+                contact.Kind == SensorContactKinds.Star &&
+                contact.Name == "Morrow Star");
+
+        Assert.Equal("local-sector", world.LocalSectorScan.Id);
+        Assert.Equal(DistanceUnits.Kilometer, world.LocalSectorScan.DistanceUnit);
+        Assert.Equal(8_000, world.LocalSectorScan.Radius);
+        Assert.Equal(4, world.LocalSectorScan.Contacts.Count);
+        Assert.Contains(
+            world.LocalSectorScan.Contacts,
+            contact =>
+                contact.Kind == SensorContactKinds.Debris &&
+                contact.Name == "Silent Probe");
+
+        Assert.All(
+            world.LongRangeScan.Contacts.Concat(world.LocalSectorScan.Contacts),
+            contact => Assert.True(contact.SignalAgeSeconds > 0));
     }
 
     private static GameManager CreateManager(IGameEventStore store)

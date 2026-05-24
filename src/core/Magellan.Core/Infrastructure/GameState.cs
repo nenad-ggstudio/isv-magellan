@@ -1,3 +1,5 @@
+using World;
+
 namespace Infrastructure;
 
 public sealed record GameState(
@@ -25,7 +27,8 @@ public sealed record GameState(
                 new GameResources(
                     Water: 148,
                     Iron: 62,
-                    Power: 91)));
+                    Power: 91),
+                GameWorld.StartingWorld(startedAt)));
     }
 }
 
@@ -35,7 +38,8 @@ public sealed record ActiveGameState(
     Guid Id,
     string Name,
     DateTimeOffset StartedAt,
-    GameResources Resources);
+    GameResources Resources,
+    GameWorld World);
 
 public sealed record GameResources(int Water, int Iron, int Power);
 
