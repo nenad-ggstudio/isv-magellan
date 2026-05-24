@@ -1,16 +1,29 @@
+using ShipBatteryBank = Ship.BatteryBank.BatteryBank;
+using ShipFusionCore = Ship.FusionCore.FusionCore;
+
 namespace Ship;
 
 public sealed class Ship
 {
-    public Ship(string name, IReadOnlyList<StorageUnit> storageUnits)
+    public Ship(
+        string name,
+        IReadOnlyList<StorageUnit> storageUnits,
+        ShipFusionCore fusionCore,
+        ShipBatteryBank batteryBank)
     {
         Name = name;
         StorageUnits = storageUnits;
+        FusionCore = fusionCore;
+        BatteryBank = batteryBank;
     }
 
     public string Name { get; }
 
     public IReadOnlyList<StorageUnit> StorageUnits { get; }
+
+    public ShipFusionCore FusionCore { get; }
+
+    public ShipBatteryBank BatteryBank { get; }
 
     public static Ship StartingShip()
     {
@@ -39,6 +52,8 @@ public sealed class Ship
                 new StorageUnit(8, 100, null),
                 new StorageUnit(9, 100, null),
                 new StorageUnit(10, 100, null)
-            ]);
+            ],
+            ShipFusionCore.StartingCore(),
+            ShipBatteryBank.StartingBank());
     }
 }

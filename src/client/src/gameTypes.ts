@@ -32,9 +32,39 @@ export type StorageUnit = {
   contents: StoredResource | null
 }
 
+export type FusionFuelReservoir = {
+  fuel: 'deuterium' | 'tritium'
+  capacityKilograms: number
+  quantityKilograms: number
+  purityLevel: number
+}
+
+export type CoolantTank = {
+  coolant: 'water'
+  capacityKilograms: number
+  quantityKilograms: number
+  purityLevel: number
+}
+
+export type FusionCore = {
+  deuteriumReservoir: FusionFuelReservoir
+  tritiumReservoir: FusionFuelReservoir
+  coolantTank: CoolantTank
+}
+
+export type BatteryBank = {
+  designCapacityKilowattHours: number
+  maxCapacityKilowattHours: number
+  chargeLevel: number
+  healthLevel: number
+  storedKilowattHours: number
+}
+
 export type Ship = {
   name: string
   storageUnits: StorageUnit[]
+  fusionCore: FusionCore
+  batteryBank: BatteryBank
 }
 
 export type DistanceUnit = 'lightYear' | 'kilometer'

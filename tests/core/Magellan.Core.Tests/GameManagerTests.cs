@@ -69,6 +69,31 @@ public sealed class GameManagerTests
                 unit.Contents.QuantityKilograms == 22 &&
                 unit.Contents.PurityLevel == 0.98);
 
+        var fusionCore = ship.FusionCore;
+
+        Assert.Equal("deuterium", fusionCore.DeuteriumReservoir.Fuel);
+        Assert.Equal(100, fusionCore.DeuteriumReservoir.CapacityKilograms);
+        Assert.Equal(86, fusionCore.DeuteriumReservoir.QuantityKilograms);
+        Assert.Equal(0.97, fusionCore.DeuteriumReservoir.PurityLevel);
+
+        Assert.Equal("tritium", fusionCore.TritiumReservoir.Fuel);
+        Assert.Equal(100, fusionCore.TritiumReservoir.CapacityKilograms);
+        Assert.Equal(64, fusionCore.TritiumReservoir.QuantityKilograms);
+        Assert.Equal(0.95, fusionCore.TritiumReservoir.PurityLevel);
+
+        Assert.Equal("water", fusionCore.CoolantTank.Coolant);
+        Assert.Equal(10_000, fusionCore.CoolantTank.CapacityKilograms);
+        Assert.Equal(7_600, fusionCore.CoolantTank.QuantityKilograms);
+        Assert.Equal(0.92, fusionCore.CoolantTank.PurityLevel);
+
+        var batteryBank = ship.BatteryBank;
+
+        Assert.Equal(5_000, batteryBank.DesignCapacityKilowattHours);
+        Assert.Equal(0.74, batteryBank.ChargeLevel);
+        Assert.Equal(0.91, batteryBank.HealthLevel);
+        Assert.Equal(4_550, batteryBank.MaxCapacityKilowattHours, precision: 3);
+        Assert.Equal(3_367, batteryBank.StoredKilowattHours, precision: 3);
+
         var world = activeGame.World;
 
         Assert.Equal("Ship Origin", world.ShipPosition.Label);

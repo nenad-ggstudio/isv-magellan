@@ -105,6 +105,24 @@ public sealed class FileGameEventStoreTests
         Assert.Equal(
             expectedGame.Ship.StorageUnits.Select(unit => unit.Contents?.Resource),
             actualGame.Ship.StorageUnits.Select(unit => unit.Contents?.Resource));
+        Assert.Equal(
+            expectedGame.Ship.FusionCore.DeuteriumReservoir.QuantityKilograms,
+            actualGame.Ship.FusionCore.DeuteriumReservoir.QuantityKilograms);
+        Assert.Equal(
+            expectedGame.Ship.FusionCore.TritiumReservoir.PurityLevel,
+            actualGame.Ship.FusionCore.TritiumReservoir.PurityLevel);
+        Assert.Equal(
+            expectedGame.Ship.FusionCore.CoolantTank.CapacityKilograms,
+            actualGame.Ship.FusionCore.CoolantTank.CapacityKilograms);
+        Assert.Equal(
+            expectedGame.Ship.BatteryBank.DesignCapacityKilowattHours,
+            actualGame.Ship.BatteryBank.DesignCapacityKilowattHours);
+        Assert.Equal(
+            expectedGame.Ship.BatteryBank.MaxCapacityKilowattHours,
+            actualGame.Ship.BatteryBank.MaxCapacityKilowattHours);
+        Assert.Equal(
+            expectedGame.Ship.BatteryBank.ChargeLevel,
+            actualGame.Ship.BatteryBank.ChargeLevel);
         Assert.Equal(expectedGame.World.ShipPosition, actualGame.World.ShipPosition);
         Assert.Equal(
             expectedGame.World.LongRangeScan.Contacts.Select(contact => contact.Id),
