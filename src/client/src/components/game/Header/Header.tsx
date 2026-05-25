@@ -23,24 +23,38 @@ export function Header({
       </div>
       <div className="ship-system-summary">
         <section className="system-card" aria-label="Fusion core reserves">
-          <h2>Fusion Core</h2>
+          <img
+            className="system-card-icon"
+            src="/fusion-core-icon.svg"
+            alt=""
+            aria-hidden="true"
+          />
           <dl>
             <div>
-              <dt>D2</dt>
-              <dd>{formatReservoir(game.ship.fusionCore.deuteriumReservoir)}</dd>
+              <dt>
+                D2 ({formatPurity(game.ship.fusionCore.deuteriumReservoir.purityLevel)})
+              </dt>
+              <dd>{formatKilogramFill(game.ship.fusionCore.deuteriumReservoir)}</dd>
             </div>
             <div>
-              <dt>T2</dt>
-              <dd>{formatReservoir(game.ship.fusionCore.tritiumReservoir)}</dd>
+              <dt>
+                T2 ({formatPurity(game.ship.fusionCore.tritiumReservoir.purityLevel)})
+              </dt>
+              <dd>{formatKilogramFill(game.ship.fusionCore.tritiumReservoir)}</dd>
             </div>
             <div>
-              <dt>H2O</dt>
-              <dd>{formatCoolant(game.ship.fusionCore.coolantTank)}</dd>
+              <dt>H2O ({formatPurity(game.ship.fusionCore.coolantTank.purityLevel)})</dt>
+              <dd>{formatTonFill(game.ship.fusionCore.coolantTank)}</dd>
             </div>
           </dl>
         </section>
         <section className="system-card" aria-label="Battery bank status">
-          <h2>Battery Bank</h2>
+          <img
+            className="system-card-icon"
+            src="/batery-bank-icon.svg"
+            alt=""
+            aria-hidden="true"
+          />
           <dl>
             <div>
               <dt>Charge</dt>
@@ -61,32 +75,30 @@ export function Header({
   )
 }
 
-function formatReservoir({
-  purityLevel,
+function formatKilogramFill({
+  capacityKilograms,
   quantityKilograms,
 }: {
-  purityLevel: number
+  capacityKilograms: number
   quantityKilograms: number
 }) {
-  return `${formatMass(quantityKilograms)} / ${formatPurity(purityLevel)}`
+  return `${Math.round(quantityKilograms)}/${Math.round(capacityKilograms)} kg`
 }
 
-function formatCoolant({
-  purityLevel,
+function formatTonFill({
+  capacityKilograms,
   quantityKilograms,
 }: {
-  purityLevel: number
+  capacityKilograms: number
   quantityKilograms: number
 }) {
-  return `${formatMass(quantityKilograms)} / ${formatPurity(purityLevel)}`
+  return `${formatTons(quantityKilograms)}/${formatTons(capacityKilograms)} t`
 }
 
-function formatMass(kilograms: number) {
-  if (kilograms >= 1_000) {
-    return `${(kilograms / 1_000).toFixed(1)} t`
-  }
+function formatTons(kilograms: number) {
+  const tons = kilograms / 1_000
 
-  return `${Math.round(kilograms)} kg`
+  return Number.isInteger(tons) ? String(tons) : tons.toFixed(1)
 }
 
 function formatPurity(purityLevel: number) {
