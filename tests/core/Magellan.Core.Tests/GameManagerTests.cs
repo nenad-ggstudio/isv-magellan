@@ -96,21 +96,56 @@ public sealed class GameManagerTests
 
         var world = activeGame.World;
 
-        Assert.Equal("Ship Origin", world.ShipPosition.Label);
-        Assert.Equal(DistanceUnits.Kilometer, world.ShipPosition.Unit);
+        Assert.Equal("Solar System", world.ShipPosition.Label);
+        Assert.Equal(DistanceUnits.LightYear, world.ShipPosition.Unit);
         Assert.Equal(activeGame.StartedAt, world.CurrentTime);
 
-        Assert.Equal("long-range", world.LongRangeScan.Id);
-        Assert.Equal(DistanceUnits.LightYear, world.LongRangeScan.DistanceUnit);
-        Assert.Equal(4, world.LongRangeScan.Radius);
-        Assert.Equal(5, world.LongRangeScan.Contacts.Count);
+        Assert.Equal("long-range-map", world.LongRangeMap.Id);
+        Assert.Equal(DistanceUnits.LightYear, world.LongRangeMap.DistanceUnit);
+        Assert.Equal(22, world.LongRangeMap.Width);
+        Assert.Equal(22, world.LongRangeMap.Height);
+        Assert.Equal(7, world.LongRangeMap.Systems.Count);
         Assert.All(
-            world.LongRangeScan.Contacts,
-            contact =>
+            world.LongRangeMap.Systems,
+            system =>
             {
-                Assert.Equal(Asteroid.ObjectKind, contact.Kind);
-                Assert.EndsWith("-type", contact.AsteroidTypeId);
-                Assert.Empty(contact.ResourceEstimates);
+                Assert.NotEmpty(system.Name);
+                Assert.True(system.Distance >= 0);
+                Assert.Equal(3, system.ResourceDetections.Count);
+            });
+
+        Assert.Equal("jump-area", world.JumpAreaMap.Id);
+        Assert.Equal("Jump Area", world.JumpAreaMap.Label);
+        Assert.Equal(DistanceUnits.LightYear, world.JumpAreaMap.DistanceUnit);
+        Assert.Equal(2, world.JumpAreaMap.Width);
+        Assert.Equal(2, world.JumpAreaMap.Height);
+
+        var jumpAreaSystem = Assert.Single(world.JumpAreaMap.Systems);
+
+        Assert.Equal("solar-system", jumpAreaSystem.Id);
+        Assert.Equal(1, jumpAreaSystem.X);
+        Assert.Equal(1, jumpAreaSystem.Y);
+        Assert.Equal(0, jumpAreaSystem.Distance);
+
+        Assert.InRange(world.JumpAreaMap.Anomalies.Count, 5, 6);
+        Assert.All(
+            world.JumpAreaMap.Anomalies,
+            anomaly =>
+            {
+                Assert.StartsWith("jump-anomaly-", anomaly.Id);
+                Assert.Contains(
+                    anomaly.Kind,
+                    new[]
+                    {
+                        SensorAnomalyKinds.RoguePlanet,
+                        SensorAnomalyKinds.AsteroidCluster,
+                        SensorAnomalyKinds.Comet,
+                        SensorAnomalyKinds.EnergyParticleWells
+                    });
+                Assert.NotEmpty(anomaly.Label);
+                Assert.InRange(anomaly.X, 0, world.JumpAreaMap.Width);
+                Assert.InRange(anomaly.Y, 0, world.JumpAreaMap.Height);
+                Assert.InRange(anomaly.Distance, 0, world.JumpAreaMap.Width / 2);
             });
 
         Assert.Equal("local-sector", world.LocalSectorScan.Id);
@@ -135,7 +170,7 @@ public sealed class GameManagerTests
             });
 
         Assert.All(
-            world.LongRangeScan.Contacts.Concat(world.LocalSectorScan.Contacts),
+            world.LocalSectorScan.Contacts,
             contact => Assert.True(contact.SignalAgeSeconds > 0));
 
         Assert.Contains(

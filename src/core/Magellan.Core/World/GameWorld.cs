@@ -7,11 +7,21 @@ public sealed record GameWorld(
     WorldPosition ShipPosition,
     DateTimeOffset CurrentTime,
     LongRangeMap LongRangeMap,
+    JumpAreaMap JumpAreaMap,
     SensorScan LocalSectorScan)
 {
     private const string LongRangeMapPath = "World/Data/long-range-map.json";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private const double LightSpeedKilometersPerSecond = 299_792.458;
+    private const double JumpAreaSpanLightYears = 2;
+    private const double JumpAreaRadiusLightYears = JumpAreaSpanLightYears / 2;
+    private static readonly (string Kind, string Label)[] SensorAnomalyTypes =
+    [
+        (SensorAnomalyKinds.RoguePlanet, "Rogue Planet"),
+        (SensorAnomalyKinds.AsteroidCluster, "Asteroid Cluster"),
+        (SensorAnomalyKinds.Comet, "Comet"),
+        (SensorAnomalyKinds.EnergyParticleWells, "Energy Particle Wells")
+    ];
 
     public static GameWorld StartingWorld(DateTimeOffset currentTime)
     {
@@ -25,11 +35,13 @@ public sealed record GameWorld(
             originSystem.X,
             originSystem.Y,
             longRangeMapData.DistanceUnit);
+        var longRangeMap = BuildLongRangeMap(longRangeMapData, shipPosition);
 
         return new GameWorld(
             shipPosition,
             currentTime,
-            BuildLongRangeMap(longRangeMapData, shipPosition),
+            longRangeMap,
+            BuildJumpAreaMap(longRangeMap, shipPosition, currentTime),
             new SensorScan(
                 "local-sector",
                 "Local Sector Sensors",
@@ -118,6 +130,78 @@ public sealed record GameWorld(
                     system.PlanetCountAccuracy,
                     system.ResourceDetections))
                 .ToArray());
+    }
+
+    private static JumpAreaMap BuildJumpAreaMap(
+        LongRangeMap longRangeMap,
+        WorldPosition shipPosition,
+        DateTimeOffset currentTime)
+    {
+        var center = JumpAreaSpanLightYears / 2;
+
+        return new JumpAreaMap(
+            "jump-area",
+            "Jump Area",
+            JumpAreaSpanLightYears,
+            JumpAreaSpanLightYears,
+            longRangeMap.DistanceUnit,
+            longRangeMap.Systems
+                .Select(system => system with
+                {
+                    X = center + system.X - shipPosition.X,
+                    Y = center + system.Y - shipPosition.Y
+                })
+                .Where(system => IsInsideJumpArea(system.X, system.Y))
+                .OrderBy(system => system.Distance)
+                .ToArray(),
+            BuildDefaultSensorAnomalies(shipPosition, currentTime));
+    }
+
+    private static SensorAnomaly[] BuildDefaultSensorAnomalies(
+        WorldPosition shipPosition,
+        DateTimeOffset currentTime)
+    {
+        var random = new Random(GetJumpAreaSeed(shipPosition, currentTime));
+        var anomalyCount = random.Next(5, 7);
+
+        return Enumerable.Range(1, anomalyCount)
+            .Select(index => BuildSensorAnomaly(index, random))
+            .ToArray();
+    }
+
+    private static SensorAnomaly BuildSensorAnomaly(int index, Random random)
+    {
+        var center = JumpAreaSpanLightYears / 2;
+        var distance = Math.Sqrt(random.NextDouble()) * JumpAreaRadiusLightYears;
+        var angleRadians = random.NextDouble() * Math.Tau;
+        var anomalyType = SensorAnomalyTypes[random.Next(SensorAnomalyTypes.Length)];
+
+        return new SensorAnomaly(
+            $"jump-anomaly-{index:000}",
+            anomalyType.Kind,
+            anomalyType.Label,
+            center + (Math.Cos(angleRadians) * distance),
+            center + (Math.Sin(angleRadians) * distance),
+            distance);
+    }
+
+    private static int GetJumpAreaSeed(
+        WorldPosition shipPosition,
+        DateTimeOffset currentTime)
+    {
+        return unchecked(
+            (int)currentTime.ToUnixTimeMilliseconds() ^
+            (int)(shipPosition.X * 1_000) ^
+            (int)(shipPosition.Y * 10_000));
+    }
+
+    private static bool IsInsideJumpArea(double x, double y)
+    {
+        return
+            x >= 0 &&
+            x <= JumpAreaSpanLightYears &&
+            y >= 0 &&
+            y <= JumpAreaSpanLightYears;
     }
 
     private static SensorContact LocalContact(Asteroid asteroid)

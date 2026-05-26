@@ -3,6 +3,7 @@ import type { KeyboardEvent, PointerEvent, WheelEvent } from 'react'
 import type {
   DistanceUnit,
   GameWorld,
+  JumpAreaMap,
   LongRangeMap,
   SensorContact,
   SensorScan,
@@ -14,7 +15,14 @@ type NavigationProps = {
   world: GameWorld
 }
 
-type NavigationMode = 'long-range-map' | 'local-sector'
+type NavigationMode = 'long-range-map' | 'jump-area' | 'local-sector'
+
+type StellarMap = LongRangeMap | JumpAreaMap
+
+type MapPosition = {
+  x: number
+  y: number
+}
 
 type SectorViewport = {
   centerX: number
@@ -39,17 +47,25 @@ type SectorGridLine = {
 
 const navigationModes: Array<{ id: NavigationMode; label: string }> = [
   { id: 'long-range-map', label: 'Sector Map' },
+  { id: 'jump-area', label: 'Jump Area' },
   { id: 'local-sector', label: 'Local Scan' },
 ]
 
 const mapCenter = 50
 const mapRadius = 42
 const sectorMinimumViewLightYears = 1
+const sectorGridStepLightYears = 1
+const sectorMajorGridStepLightYears = 5
+const jumpAreaMinimumViewLightYears = 0.1
+const jumpAreaGridStepLightYears = 0.1
+const jumpAreaMajorGridStepLightYears = 0.5
 const sectorZoomMultiplier = 1.6
 
 export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
   const [mode, setMode] = useState<NavigationMode>('long-range-map')
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null)
+  const jumpAreaShipPosition = getMapCenterPosition(world.jumpAreaMap)
+  const stellarGizmoReferenceSpan = getSectorBaseSpan(world.longRangeMap)
   const sortedContacts = useMemo(
     () =>
       [...world.localSectorScan.contacts].sort(
@@ -65,10 +81,19 @@ export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
       ) ?? null,
     [selectedSystemId, world.longRangeMap.systems],
   )
+  const selectedJumpAreaSystem = useMemo(
+    () =>
+      world.jumpAreaMap.systems.find(
+        (system) => system.id === selectedSystemId,
+      ) ?? null,
+    [selectedSystemId, world.jumpAreaMap.systems],
+  )
   const activeLabel =
     mode === 'long-range-map'
       ? world.longRangeMap.label
-      : world.localSectorScan.label
+      : mode === 'jump-area'
+        ? world.jumpAreaMap.label
+        : world.localSectorScan.label
 
   return (
     <section className="navigation-panel" aria-label="Navigation">
@@ -101,15 +126,43 @@ export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
         {mode === 'long-range-map' ? (
           <div className="navigation-content navigation-content--long-range-map">
             <LongRangeMapView
+              gizmoReferenceSpan={stellarGizmoReferenceSpan}
+              gridStep={sectorGridStepLightYears}
+              key="long-range-map"
               map={world.longRangeMap}
+              majorGridStep={sectorMajorGridStepLightYears}
+              minimumViewSpan={sectorMinimumViewLightYears}
               onSelectSystem={setSelectedSystemId}
               selectedSystemId={selectedSystemId}
               shipPosition={world.shipPosition}
             />
-            <LongRangeReadout
+            <StellarReadout
               elapsedMilliseconds={elapsedMilliseconds}
+              extentLabel="Sector"
+              extentValue={getMapDiagonal(world.longRangeMap)}
               map={world.longRangeMap}
               selectedSystem={selectedSystem}
+            />
+          </div>
+        ) : mode === 'jump-area' ? (
+          <div className="navigation-content navigation-content--long-range-map">
+            <LongRangeMapView
+              gizmoReferenceSpan={stellarGizmoReferenceSpan}
+              gridStep={jumpAreaGridStepLightYears}
+              key="jump-area"
+              map={world.jumpAreaMap}
+              majorGridStep={jumpAreaMajorGridStepLightYears}
+              minimumViewSpan={jumpAreaMinimumViewLightYears}
+              onSelectSystem={setSelectedSystemId}
+              selectedSystemId={selectedSystemId}
+              shipPosition={jumpAreaShipPosition}
+            />
+            <StellarReadout
+              elapsedMilliseconds={elapsedMilliseconds}
+              extentLabel="Area"
+              extentValue={world.jumpAreaMap.width}
+              map={world.jumpAreaMap}
+              selectedSystem={selectedJumpAreaSystem}
             />
           </div>
         ) : (
@@ -128,27 +181,42 @@ export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
 }
 
 function LongRangeMapView({
+  gizmoReferenceSpan,
+  gridStep,
   map,
+  majorGridStep,
+  minimumViewSpan,
   onSelectSystem,
   selectedSystemId,
   shipPosition,
 }: {
-  map: LongRangeMap
+  gizmoReferenceSpan: number
+  gridStep: number
+  map: StellarMap
+  majorGridStep: number
+  minimumViewSpan: number
   onSelectSystem: (systemId: string) => void
   selectedSystemId: string | null
-  shipPosition: GameWorld['shipPosition']
+  shipPosition: MapPosition
 }) {
   const [viewport, setViewport] = useState(() =>
     getInitialSectorViewport(map),
   )
   const [dragState, setDragState] = useState<DragState | null>(null)
-  const constrainedViewport = constrainSectorViewport(map, viewport)
+  const constrainedViewport = constrainSectorViewport(
+    map,
+    viewport,
+    minimumViewSpan,
+  )
   const viewSpan = getSectorViewSpan(map, constrainedViewport.zoom)
   const viewLeft = constrainedViewport.centerX - viewSpan / 2
   const viewTop = constrainedViewport.centerY - viewSpan / 2
-  const gridLines = useMemo(() => buildSectorGridLines(map), [map])
+  const gridLines = useMemo(
+    () => buildSectorGridLines(map, gridStep, majorGridStep),
+    [gridStep, majorGridStep, map],
+  )
   const zoomInDisabled =
-    constrainedViewport.zoom >= getMaximumSectorZoom(map)
+    constrainedViewport.zoom >= getMaximumSectorZoom(map, minimumViewSpan)
   const zoomOutDisabled = constrainedViewport.zoom <= 1
 
   function changeZoom(multiplier: number) {
@@ -157,6 +225,7 @@ function LongRangeMapView({
         map,
         currentViewport,
         currentViewport.zoom * multiplier,
+        minimumViewSpan,
       ),
     )
   }
@@ -167,11 +236,15 @@ function LongRangeMapView({
 
   function zoomToShip() {
     setViewport(
-      constrainSectorViewport(map, {
-        centerX: shipPosition.x,
-        centerY: map.height - shipPosition.y,
-        zoom: getMaximumSectorZoom(map),
-      }),
+      constrainSectorViewport(
+        map,
+        {
+          centerX: shipPosition.x,
+          centerY: map.height - shipPosition.y,
+          zoom: getMaximumSectorZoom(map, minimumViewSpan),
+        },
+        minimumViewSpan,
+      ),
     )
   }
 
@@ -188,7 +261,13 @@ function LongRangeMapView({
       (event.deltaY < 0 ? sectorZoomMultiplier : 1 / sectorZoomMultiplier)
 
     setViewport((currentViewport) =>
-      zoomSectorViewport(map, currentViewport, nextZoom, focus),
+      zoomSectorViewport(
+        map,
+        currentViewport,
+        nextZoom,
+        minimumViewSpan,
+        focus,
+      ),
     )
   }
 
@@ -215,14 +294,22 @@ function LongRangeMapView({
     const deltaY = event.clientY - dragState.y
 
     setViewport((currentViewport) => {
-      const current = constrainSectorViewport(map, currentViewport)
+      const current = constrainSectorViewport(
+        map,
+        currentViewport,
+        minimumViewSpan,
+      )
       const currentViewSpan = getSectorViewSpan(map, current.zoom)
 
-      return constrainSectorViewport(map, {
-        ...current,
-        centerX: current.centerX - (deltaX / bounds.width) * currentViewSpan,
-        centerY: current.centerY - (deltaY / bounds.height) * currentViewSpan,
-      })
+      return constrainSectorViewport(
+        map,
+        {
+          ...current,
+          centerX: current.centerX - (deltaX / bounds.width) * currentViewSpan,
+          centerY: current.centerY - (deltaY / bounds.height) * currentViewSpan,
+        },
+        minimumViewSpan,
+      )
     })
     setDragState({
       pointerId: event.pointerId,
@@ -327,29 +414,75 @@ function LongRangeMapView({
             onSelectSystem={onSelectSystem}
             selected={system.id === selectedSystemId}
             system={system}
+            gizmoReferenceSpan={gizmoReferenceSpan}
             zoom={constrainedViewport.zoom}
           />
         ))}
+        <ShipPositionMarker
+          gizmoReferenceSpan={gizmoReferenceSpan}
+          map={map}
+          shipPosition={shipPosition}
+          zoom={constrainedViewport.zoom}
+        />
       </svg>
     </div>
   )
 }
 
+function ShipPositionMarker({
+  gizmoReferenceSpan,
+  map,
+  shipPosition,
+  zoom,
+}: {
+  gizmoReferenceSpan: number
+  map: StellarMap
+  shipPosition: MapPosition
+  zoom: number
+}) {
+  const point = toSectorMapPoint(shipPosition, map)
+  const markerScale = getStellarGizmoScale(map, zoom, gizmoReferenceSpan)
+  const radius = 0.11 * markerScale
+  const ringRadius = 0.26 * markerScale
+  const strokeWidth = 0.045 * markerScale
+
+  return (
+    <g className="stellar-ship-position" aria-label="Ship position">
+      <circle
+        className="stellar-ship-position-ring"
+        cx={point.x}
+        cy={point.y}
+        r={ringRadius}
+        strokeWidth={strokeWidth}
+      />
+      <circle
+        className="stellar-ship-position-core"
+        cx={point.x}
+        cy={point.y}
+        r={radius}
+        strokeWidth={strokeWidth}
+      />
+    </g>
+  )
+}
+
 function StellarSystemMarker({
+  gizmoReferenceSpan,
   map,
   onSelectSystem,
   selected,
   system,
   zoom,
 }: {
-  map: LongRangeMap
+  gizmoReferenceSpan: number
+  map: StellarMap
   onSelectSystem: (systemId: string) => void
   selected: boolean
   system: StellarSystem
   zoom: number
 }) {
   const point = toSectorMapPoint(system, map)
-  const markerScale = 1 / zoom
+  const markerScale = getStellarGizmoScale(map, zoom, gizmoReferenceSpan)
   const dotRadius = 0.09 * markerScale
   const hitTargetRadius = 0.02 * markerScale
   const hoverRadius = 0.2 * markerScale
@@ -403,25 +536,25 @@ function StellarSystemMarker({
   )
 }
 
-function LongRangeReadout({
+function StellarReadout({
   elapsedMilliseconds,
+  extentLabel,
+  extentValue,
   map,
   selectedSystem,
 }: {
   elapsedMilliseconds: number
-  map: LongRangeMap
+  extentLabel: string
+  extentValue: number
+  map: StellarMap
   selectedSystem: StellarSystem | null
 }) {
-  const diagonal = Math.sqrt(
-    map.width * map.width + map.height * map.height,
-  )
-
   return (
     <aside className="stellar-readout" aria-label="Stellar system details">
       <div className="scan-summary">
         <div>
-          <span>Sector</span>
-          <strong>{formatDistance(diagonal, map.distanceUnit)}</strong>
+          <span>{extentLabel}</span>
+          <strong>{formatDistance(extentValue, map.distanceUnit)}</strong>
         </div>
         <div>
           <span>Systems</span>
@@ -610,7 +743,7 @@ function selectSystemFromKeyboard(
   onSelectSystem(system.id)
 }
 
-function getInitialSectorViewport(map: LongRangeMap): SectorViewport {
+function getInitialSectorViewport(map: StellarMap): SectorViewport {
   return {
     centerX: map.width / 2,
     centerY: map.height / 2,
@@ -618,62 +751,107 @@ function getInitialSectorViewport(map: LongRangeMap): SectorViewport {
   }
 }
 
-function buildSectorGridLines(map: LongRangeMap): SectorGridLine[] {
+function getMapCenterPosition(map: StellarMap): MapPosition {
+  return {
+    x: map.width / 2,
+    y: map.height / 2,
+  }
+}
+
+function buildSectorGridLines(
+  map: StellarMap,
+  gridStep: number,
+  majorGridStep: number,
+): SectorGridLine[] {
   const lines: SectorGridLine[] = []
 
-  for (let x = 0; x <= map.width; x += 1) {
+  for (let x = 0; x <= map.width; x += gridStep) {
+    const lineX = normalizeGridValue(x, map.width)
     lines.push({
-      id: `x-${x}`,
-      major: x % 5 === 0 || x === map.width,
-      x1: x,
-      x2: x,
+      id: `x-${lineX}`,
+      major: isMajorGridLine(lineX, map.width, majorGridStep),
+      x1: lineX,
+      x2: lineX,
       y1: 0,
       y2: map.height,
     })
   }
 
-  for (let y = 0; y <= map.height; y += 1) {
+  for (let y = 0; y <= map.height; y += gridStep) {
+    const lineY = normalizeGridValue(y, map.height)
     lines.push({
-      id: `y-${y}`,
-      major: y % 5 === 0 || y === map.height,
+      id: `y-${lineY}`,
+      major: isMajorGridLine(lineY, map.height, majorGridStep),
       x1: 0,
       x2: map.width,
-      y1: y,
-      y2: y,
+      y1: lineY,
+      y2: lineY,
     })
   }
 
   return lines
 }
 
-function getSectorBaseSpan(map: LongRangeMap) {
+function normalizeGridValue(value: number, maximum: number) {
+  return value > maximum - 0.000001
+    ? maximum
+    : Number(value.toFixed(4))
+}
+
+function isMajorGridLine(
+  value: number,
+  maximum: number,
+  majorGridStep: number,
+) {
+  return (
+    value === 0 ||
+    value === maximum ||
+    Math.abs(value / majorGridStep - Math.round(value / majorGridStep)) <
+      0.000001
+  )
+}
+
+function getSectorBaseSpan(map: StellarMap) {
   return Math.max(map.width, map.height)
 }
 
-function getMaximumSectorZoom(map: LongRangeMap) {
-  return Math.max(1, getSectorBaseSpan(map) / sectorMinimumViewLightYears)
+function getMaximumSectorZoom(map: StellarMap, minimumViewSpan: number) {
+  return Math.max(1, getSectorBaseSpan(map) / minimumViewSpan)
 }
 
-function getSectorViewSpan(map: LongRangeMap, zoom: number) {
+function getSectorViewSpan(map: StellarMap, zoom: number) {
   return getSectorBaseSpan(map) / zoom
 }
 
+function getStellarGizmoScale(
+  map: StellarMap,
+  zoom: number,
+  referenceSpan: number,
+) {
+  return getSectorBaseSpan(map) / Math.max(referenceSpan, 0.000001) / zoom
+}
+
 function zoomSectorViewport(
-  map: LongRangeMap,
+  map: StellarMap,
   viewport: SectorViewport,
   nextZoom: number,
+  minimumViewSpan: number,
   focus?: { ratioX: number; ratioY: number },
 ) {
-  const current = constrainSectorViewport(map, viewport)
-  const zoom = clamp(nextZoom, 1, getMaximumSectorZoom(map))
+  const current = constrainSectorViewport(map, viewport, minimumViewSpan)
+  const zoom = clamp(nextZoom, 1, getMaximumSectorZoom(map, minimumViewSpan))
   const currentSpan = getSectorViewSpan(map, current.zoom)
   const nextSpan = getSectorViewSpan(map, zoom)
 
   if (!focus) {
-    return constrainSectorViewport(map, {
-      ...current,
-      zoom,
-    })
+    return constrainSectorViewport(
+      map,
+      {
+        ...current,
+        zoom,
+      },
+      minimumViewSpan,
+    )
   }
 
   const currentLeft = current.centerX - currentSpan / 2
@@ -681,18 +859,27 @@ function zoomSectorViewport(
   const focusX = currentLeft + focus.ratioX * currentSpan
   const focusY = currentTop + focus.ratioY * currentSpan
 
-  return constrainSectorViewport(map, {
-    centerX: focusX + (0.5 - focus.ratioX) * nextSpan,
-    centerY: focusY + (0.5 - focus.ratioY) * nextSpan,
-    zoom,
-  })
+  return constrainSectorViewport(
+    map,
+    {
+      centerX: focusX + (0.5 - focus.ratioX) * nextSpan,
+      centerY: focusY + (0.5 - focus.ratioY) * nextSpan,
+      zoom,
+    },
+    minimumViewSpan,
+  )
 }
 
 function constrainSectorViewport(
-  map: LongRangeMap,
+  map: StellarMap,
   viewport: SectorViewport,
+  minimumViewSpan: number,
 ) {
-  const zoom = clamp(viewport.zoom, 1, getMaximumSectorZoom(map))
+  const zoom = clamp(
+    viewport.zoom,
+    1,
+    getMaximumSectorZoom(map, minimumViewSpan),
+  )
   const viewSpan = getSectorViewSpan(map, zoom)
 
   return {
@@ -718,11 +905,15 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
-function toSectorMapPoint(system: StellarSystem, map: LongRangeMap) {
+function toSectorMapPoint(position: MapPosition, map: StellarMap) {
   return {
-    x: clamp(system.x, 0, map.width),
-    y: clamp(map.height - system.y, 0, map.height),
+    x: clamp(position.x, 0, map.width),
+    y: clamp(map.height - position.y, 0, map.height),
   }
+}
+
+function getMapDiagonal(map: StellarMap) {
+  return Math.sqrt((map.width * map.width) + (map.height * map.height))
 }
 
 function toMapPoint(contact: SensorContact, radius: number) {

@@ -588,6 +588,20 @@
   stroke: #010304;
 }
 
+.stellar-ship-position {
+  pointer-events: none;
+}
+
+.stellar-ship-position-ring {
+  fill: none;
+  stroke: #55d6c2;
+}
+
+.stellar-ship-position-core {
+  fill: #f4f7f7;
+  stroke: #010304;
+}
+
 .stellar-system:hover .stellar-system-hover,
 .stellar-system:focus-visible .stellar-system-hover {
   opacity: 0.78;

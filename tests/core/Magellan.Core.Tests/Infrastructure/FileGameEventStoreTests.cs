@@ -125,8 +125,17 @@ public sealed class FileGameEventStoreTests
             actualGame.Ship.BatteryBank.ChargeLevel);
         Assert.Equal(expectedGame.World.ShipPosition, actualGame.World.ShipPosition);
         Assert.Equal(
-            expectedGame.World.LongRangeScan.Contacts.Select(contact => contact.Id),
-            actualGame.World.LongRangeScan.Contacts.Select(contact => contact.Id));
+            expectedGame.World.LongRangeMap.Systems.Select(system => system.Id),
+            actualGame.World.LongRangeMap.Systems.Select(system => system.Id));
+        Assert.Equal(
+            expectedGame.World.JumpAreaMap.Systems.Select(system => system.Id),
+            actualGame.World.JumpAreaMap.Systems.Select(system => system.Id));
+        Assert.Equal(
+            expectedGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Id),
+            actualGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Id));
+        Assert.Equal(
+            expectedGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Kind),
+            actualGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Kind));
         Assert.Equal(
             expectedGame.World.LocalSectorScan.Contacts.Select(contact => contact.Id),
             actualGame.World.LocalSectorScan.Contacts.Select(contact => contact.Id));

@@ -136,10 +136,36 @@ export type LongRangeMap = {
   systems: StellarSystem[]
 }
 
+export type SensorAnomalyKind =
+  | 'rogue-planet'
+  | 'asteroid-cluster'
+  | 'comet'
+  | 'energy-particle-wells'
+
+export type SensorAnomaly = {
+  id: string
+  kind: SensorAnomalyKind
+  label: string
+  x: number
+  y: number
+  distance: number
+}
+
+export type JumpAreaMap = {
+  id: 'jump-area'
+  label: string
+  width: number
+  height: number
+  distanceUnit: DistanceUnit
+  systems: StellarSystem[]
+  anomalies: SensorAnomaly[]
+}
+
 export type GameWorld = {
   shipPosition: WorldPosition
   currentTime: string
   longRangeMap: LongRangeMap
+  jumpAreaMap: JumpAreaMap
   localSectorScan: SensorScan
 }
 
