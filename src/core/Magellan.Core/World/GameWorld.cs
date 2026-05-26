@@ -1,3 +1,4 @@
+using System.Text.Json;
 using World.SpaceObjects.Asteroids;
 
 namespace World;
@@ -5,64 +6,30 @@ namespace World;
 public sealed record GameWorld(
     WorldPosition ShipPosition,
     DateTimeOffset CurrentTime,
-    SensorScan LongRangeScan,
+    LongRangeMap LongRangeMap,
     SensorScan LocalSectorScan)
 {
-    private const double SecondsPerLightYear = 31_557_600;
+    private const string LongRangeMapPath = "World/Data/long-range-map.json";
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private const double LightSpeedKilometersPerSecond = 299_792.458;
 
     public static GameWorld StartingWorld(DateTimeOffset currentTime)
     {
+        var longRangeMapData = LoadLongRangeMapData();
+        var originSystem = longRangeMapData.Systems
+            .FirstOrDefault(system => system.Role == "origin")
+            ?? throw new InvalidOperationException(
+                $"Long range map '{LongRangeMapPath}' must define an origin system.");
+        var shipPosition = new WorldPosition(
+            originSystem.Name,
+            originSystem.X,
+            originSystem.Y,
+            longRangeMapData.DistanceUnit);
+
         return new GameWorld(
-            new WorldPosition("Ship Origin", 0, 0, DistanceUnits.Kilometer),
+            shipPosition,
             currentTime,
-            new SensorScan(
-                "long-range",
-                "Long Range Sensors",
-                4,
-                DistanceUnits.LightYear,
-                [
-                    LongRangeContact(new Asteroid(
-                        "lr-morrow-star",
-                        "Morrow Star",
-                        1.12,
-                        -0.42,
-                        DistanceUnits.LightYear,
-                        1.08,
-                        AsteroidTypes.CType)),
-                    LongRangeContact(new Asteroid(
-                        "lr-vela-minor",
-                        "Vela Minor",
-                        -0.86,
-                        1.92,
-                        DistanceUnits.LightYear,
-                        0.92,
-                        AsteroidTypes.SType)),
-                    LongRangeContact(new Asteroid(
-                        "lr-nacre-cluster",
-                        "Nacre Cluster",
-                        2.54,
-                        1.36,
-                        DistanceUnits.LightYear,
-                        1.2,
-                        AsteroidTypes.CType)),
-                    LongRangeContact(new Asteroid(
-                        "lr-kepler-fragment",
-                        "Kepler Fragment",
-                        0.44,
-                        3.18,
-                        DistanceUnits.LightYear,
-                        0.82,
-                        AsteroidTypes.MType)),
-                    LongRangeContact(new Asteroid(
-                        "lr-sable-stone",
-                        "Sable Stone",
-                        -2.72,
-                        -1.18,
-                        DistanceUnits.LightYear,
-                        0.72,
-                        AsteroidTypes.SType))
-                ]),
+            BuildLongRangeMap(longRangeMapData, shipPosition),
             new SensorScan(
                 "local-sector",
                 "Local Sector Sensors",
@@ -104,22 +71,53 @@ public sealed record GameWorld(
                 ]));
     }
 
-    private static SensorContact LongRangeContact(Asteroid asteroid)
+    private static LongRangeMapData LoadLongRangeMapData()
     {
-        var distance = DistanceFromOrigin(asteroid.X, asteroid.Y);
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            LongRangeMapPath);
 
-        return new SensorContact(
-            asteroid.Id,
-            asteroid.Name,
-            asteroid.Kind,
-            asteroid.Type.Id,
-            asteroid.Type.Label,
-            asteroid.X,
-            asteroid.Y,
-            distance,
-            distance * SecondsPerLightYear,
-            asteroid.MarkerScale,
-            []);
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException(
+                $"Long range map data file was not found at '{path}'.",
+                path);
+        }
+
+        using var stream = File.OpenRead(path);
+        var longRangeMap = JsonSerializer.Deserialize<LongRangeMapData>(
+            stream,
+            JsonOptions);
+
+        return longRangeMap
+            ?? throw new InvalidOperationException(
+                $"Long range map data file '{path}' could not be deserialized.");
+    }
+
+    private static LongRangeMap BuildLongRangeMap(
+        LongRangeMapData data,
+        WorldPosition shipPosition)
+    {
+        return new LongRangeMap(
+            data.Id,
+            data.Label,
+            data.Width,
+            data.Height,
+            data.DistanceUnit,
+            data.Systems
+                .Select(system => new StellarSystem(
+                    system.Id,
+                    system.Name,
+                    system.Role,
+                    system.StarType,
+                    system.StarSizeSolarRadii,
+                    system.X,
+                    system.Y,
+                    DistanceBetween(shipPosition.X, shipPosition.Y, system.X, system.Y),
+                    system.PlanetCountPrediction,
+                    system.PlanetCountAccuracy,
+                    system.ResourceDetections))
+                .ToArray());
     }
 
     private static SensorContact LocalContact(Asteroid asteroid)
@@ -144,4 +142,36 @@ public sealed record GameWorld(
     {
         return Math.Sqrt((x * x) + (y * y));
     }
+
+    private static double DistanceBetween(
+        double originX,
+        double originY,
+        double x,
+        double y)
+    {
+        var deltaX = x - originX;
+        var deltaY = y - originY;
+
+        return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+    }
+
+    private sealed record LongRangeMapData(
+        string Id,
+        string Label,
+        double Width,
+        double Height,
+        string DistanceUnit,
+        IReadOnlyList<StellarSystemData> Systems);
+
+    private sealed record StellarSystemData(
+        string Id,
+        string Name,
+        string Role,
+        string StarType,
+        double StarSizeSolarRadii,
+        double X,
+        double Y,
+        int PlanetCountPrediction,
+        double PlanetCountAccuracy,
+        IReadOnlyList<ResourceDetection> ResourceDetections);
 }

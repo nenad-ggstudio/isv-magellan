@@ -1,0 +1,205 @@
+{
+  "id": "long-range-map",
+  "label": "Long Range Map",
+  "width": 22,
+  "height": 22,
+  "distanceUnit": "lightYear",
+  "systems": [
+    {
+      "id": "solar-system",
+      "name": "Solar System",
+      "role": "origin",
+      "starType": "G-type main sequence",
+      "starSizeSolarRadii": 1,
+      "x": 2,
+      "y": 2,
+      "planetCountPrediction": 8,
+      "planetCountAccuracy": 0.98,
+      "resourceDetections": [
+        {
+          "resource": "water",
+          "detected": true,
+          "confidence": 0.82
+        },
+        {
+          "resource": "lithium",
+          "detected": true,
+          "confidence": 0.69
+        },
+        {
+          "resource": "carbon",
+          "detected": true,
+          "confidence": 0.76
+        }
+      ]
+    },
+    {
+      "id": "morrow-halt",
+      "name": "Morrow Halt",
+      "role": "waypoint",
+      "starType": "K-type main sequence",
+      "starSizeSolarRadii": 0.74,
+      "x": 4.9,
+      "y": 6.4,
+      "planetCountPrediction": 3,
+      "planetCountAccuracy": 0.68,
+      "resourceDetections": [
+        {
+          "resource": "water",
+          "detected": true,
+          "confidence": 0.82
+        },
+        {
+          "resource": "lithium",
+          "detected": false,
+          "confidence": 0.18
+        },
+        {
+          "resource": "carbon",
+          "detected": true,
+          "confidence": 0.76
+        }
+      ]
+    },
+    {
+      "id": "vela-minor",
+      "name": "Vela Minor",
+      "role": "waypoint",
+      "starType": "M-type red dwarf",
+      "starSizeSolarRadii": 0.42,
+      "x": 9.4,
+      "y": 6.8,
+      "planetCountPrediction": 2,
+      "planetCountAccuracy": 0.62,
+      "resourceDetections": [
+        {
+          "resource": "water",
+          "detected": true,
+          "confidence": 0.82
+        },
+        {
+          "resource": "lithium",
+          "detected": false,
+          "confidence": 0.18
+        },
+        {
+          "resource": "carbon",
+          "detected": false,
+          "confidence": 0.24
+        }
+      ]
+    },
+    {
+      "id": "nacre-line",
+      "name": "Nacre Line",
+      "role": "waypoint",
+      "starType": "F-type main sequence",
+      "starSizeSolarRadii": 1.28,
+      "x": 9.5,
+      "y": 12.1,
+      "planetCountPrediction": 5,
+      "planetCountAccuracy": 0.59,
+      "resourceDetections": [
+        {
+          "resource": "water",
+          "detected": false,
+          "confidence": 0.21
+        },
+        {
+          "resource": "lithium",
+          "detected": true,
+          "confidence": 0.69
+        },
+        {
+          "resource": "carbon",
+          "detected": true,
+          "confidence": 0.76
+        }
+      ]
+    },
+    {
+      "id": "kepler-cross",
+      "name": "Kepler Cross",
+      "role": "waypoint",
+      "starType": "G-type main sequence",
+      "starSizeSolarRadii": 0.96,
+      "x": 14.9,
+      "y": 12.7,
+      "planetCountPrediction": 4,
+      "planetCountAccuracy": 0.64,
+      "resourceDetections": [
+        {
+          "resource": "water",
+          "detected": true,
+          "confidence": 0.82
+        },
+        {
+          "resource": "lithium",
+          "detected": true,
+          "confidence": 0.69
+        },
+        {
+          "resource": "carbon",
+          "detected": false,
+          "confidence": 0.24
+        }
+      ]
+    },
+    {
+      "id": "sable-gate",
+      "name": "Sable Gate",
+      "role": "waypoint",
+      "starType": "A-type white star",
+      "starSizeSolarRadii": 1.71,
+      "x": 13.3,
+      "y": 17.5,
+      "planetCountPrediction": 1,
+      "planetCountAccuracy": 0.51,
+      "resourceDetections": [
+        {
+          "resource": "water",
+          "detected": false,
+          "confidence": 0.21
+        },
+        {
+          "resource": "lithium",
+          "detected": false,
+          "confidence": 0.18
+        },
+        {
+          "resource": "carbon",
+          "detected": true,
+          "confidence": 0.76
+        }
+      ]
+    },
+    {
+      "id": "terminus",
+      "name": "Terminus",
+      "role": "destination",
+      "starType": "K-type orange dwarf",
+      "starSizeSolarRadii": 0.81,
+      "x": 18.5,
+      "y": 20.68,
+      "planetCountPrediction": 6,
+      "planetCountAccuracy": 0.55,
+      "resourceDetections": [
+        {
+          "resource": "water",
+          "detected": true,
+          "confidence": 0.82
+        },
+        {
+          "resource": "lithium",
+          "detected": true,
+          "confidence": 0.69
+        },
+        {
+          "resource": "carbon",
+          "detected": true,
+          "confidence": 0.76
+        }
+      ]
+    }
+  ]
+}

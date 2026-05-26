@@ -98,17 +98,48 @@ export type SensorContact = {
 }
 
 export type SensorScan = {
-  id: 'long-range' | 'local-sector'
+  id: 'local-sector'
   label: string
   radius: number
   distanceUnit: DistanceUnit
   contacts: SensorContact[]
 }
 
+export type StellarSystemRole = 'origin' | 'waypoint' | 'destination'
+
+export type ResourceDetection = {
+  resource: ResourceName
+  detected: boolean
+  confidence: number
+}
+
+export type StellarSystem = {
+  id: string
+  name: string
+  role: StellarSystemRole
+  starType: string
+  starSizeSolarRadii: number
+  x: number
+  y: number
+  distance: number
+  planetCountPrediction: number
+  planetCountAccuracy: number
+  resourceDetections: ResourceDetection[]
+}
+
+export type LongRangeMap = {
+  id: 'long-range-map'
+  label: string
+  width: number
+  height: number
+  distanceUnit: DistanceUnit
+  systems: StellarSystem[]
+}
+
 export type GameWorld = {
   shipPosition: WorldPosition
   currentTime: string
-  longRangeScan: SensorScan
+  longRangeMap: LongRangeMap
   localSectorScan: SensorScan
 }
 

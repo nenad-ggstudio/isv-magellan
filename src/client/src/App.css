@@ -412,6 +412,10 @@
   min-height: 0;
 }
 
+.navigation-content--long-range-map {
+  grid-template-columns: minmax(340px, 1fr) minmax(250px, 320px);
+}
+
 .sensor-map {
   display: grid;
   place-items: center;
@@ -427,6 +431,176 @@
   max-height: 100%;
   aspect-ratio: 1;
   filter: drop-shadow(0 0 24px rgb(92 162 155 / 16%));
+}
+
+.stellar-map {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  place-items: center;
+}
+
+.stellar-map svg {
+  display: block;
+  width: min(100%, 900px);
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 1;
+  cursor: grab;
+  filter: drop-shadow(0 0 32px rgb(172 199 193 / 10%));
+  touch-action: none;
+}
+
+.stellar-map[data-dragging='true'] svg {
+  cursor: grabbing;
+}
+
+.stellar-map-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #263235;
+  border-radius: 6px;
+  background: rgb(3 6 7 / 86%);
+}
+
+.map-control-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid #263235;
+  background: transparent;
+  color: #dce7e5;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.map-control-button:last-child {
+  border-right: 0;
+}
+
+.map-control-button--ship {
+  width: 46px;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.map-control-button:hover:not(:disabled) {
+  background: #162021;
+}
+
+.map-control-button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #f4f7f7;
+  outline-offset: -2px;
+}
+
+.map-control-button:disabled {
+  color: #4f6263;
+  cursor: not-allowed;
+}
+
+.stellar-map-scale {
+  min-width: 62px;
+  border-right: 1px solid #263235;
+  color: #91aaaa;
+  font-size: 11px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.stellar-sector-boundary {
+  fill: rgb(1 3 4 / 72%);
+  stroke: rgb(180 207 204 / 36%);
+  stroke-width: 1;
+}
+
+.stellar-sector-grid-line {
+  stroke: rgb(131 157 158 / 11%);
+  stroke-width: 1;
+}
+
+.stellar-sector-grid-line[data-major='true'] {
+  stroke: rgb(155 184 184 / 19%);
+}
+
+.stellar-system {
+  color: #d8e0df;
+  cursor: pointer;
+}
+
+.stellar-system[data-spectral-type='o'] {
+  color: #9fbdff;
+}
+
+.stellar-system[data-spectral-type='b'] {
+  color: #b7ccff;
+}
+
+.stellar-system[data-spectral-type='a'] {
+  color: #f1f6ff;
+}
+
+.stellar-system[data-spectral-type='f'] {
+  color: #fff0bc;
+}
+
+.stellar-system[data-spectral-type='g'] {
+  color: #ffd96a;
+}
+
+.stellar-system[data-spectral-type='k'] {
+  color: #ffad5b;
+}
+
+.stellar-system[data-spectral-type='m'] {
+  color: #ff755f;
+}
+
+.stellar-system-hit-target {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.stellar-system-hover,
+.stellar-system-selection {
+  fill: none;
+  opacity: 0;
+  stroke: currentColor;
+  transition: opacity 140ms ease;
+}
+
+.stellar-system-dot {
+  fill: currentColor;
+  stroke: #010304;
+}
+
+.stellar-system:hover .stellar-system-hover,
+.stellar-system:focus-visible .stellar-system-hover {
+  opacity: 0.78;
+}
+
+.stellar-system[data-selected='true'] .stellar-system-selection {
+  opacity: 0.9;
+}
+
+.stellar-system,
+.stellar-system:focus,
+.stellar-system:focus-visible {
+  outline: none;
 }
 
 .sensor-range,
@@ -474,7 +648,8 @@
   color: #b9c0b6;
 }
 
-.scan-readout {
+.scan-readout,
+.stellar-readout {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
@@ -512,6 +687,120 @@
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.stellar-detail {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #1d282a;
+  border-radius: 6px;
+  background: rgb(4 8 9 / 76%);
+  padding: 14px;
+  text-align: left;
+}
+
+.stellar-detail--empty {
+  place-content: center;
+  text-align: center;
+}
+
+.stellar-detail--empty span {
+  color: #7f999a;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.stellar-detail--empty strong {
+  color: #dce7e5;
+  font-size: 14px;
+}
+
+.stellar-detail-header {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stellar-detail-header span,
+.stellar-detail-list dt,
+.resource-detection-panel > span,
+.resource-detections span {
+  color: #7f999a;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.stellar-detail-header h3 {
+  margin: 0;
+  overflow: hidden;
+  color: #f2f7f6;
+  font-size: 18px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stellar-detail-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.stellar-detail-list div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-top: 1px solid #1d282a;
+  padding-top: 8px;
+}
+
+.stellar-detail-list dd {
+  margin: 0;
+  color: #dce7e5;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.resource-detection-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.resource-detections {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resource-detections li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 10px;
+  min-width: 0;
+  border-top: 1px solid #1d282a;
+  padding-top: 7px;
+}
+
+.resource-detections strong {
+  color: #dce7e5;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.resource-detections small {
+  grid-column: 2;
+  color: #91aaaa;
+  font-size: 11px;
+}
+
+.resource-detections li[data-detected='true'] strong {
+  color: #e5f6ce;
 }
 
 .contact-list {
@@ -721,11 +1010,20 @@
     gap: 14px;
   }
 
+  .navigation-content--long-range-map {
+    grid-template-rows: minmax(320px, 0.95fr) minmax(260px, 1fr);
+  }
+
   .sensor-map svg {
     width: min(100%, 360px);
   }
 
-  .scan-readout {
+  .stellar-map svg {
+    width: min(100%, 430px);
+  }
+
+  .scan-readout,
+  .stellar-readout {
     min-height: 0;
   }
 }
