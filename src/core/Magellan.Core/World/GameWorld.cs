@@ -8,7 +8,8 @@ public sealed record GameWorld(
     DateTimeOffset CurrentTime,
     LongRangeMap LongRangeMap,
     JumpAreaMap JumpAreaMap,
-    SensorScan LocalSectorScan)
+    SensorScan LocalSectorScan
+)
 {
     private const string LongRangeMapPath = "World/Data/long-range-map.json";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -20,21 +21,23 @@ public sealed record GameWorld(
         (SensorAnomalyKinds.RoguePlanet, "Rogue Planet"),
         (SensorAnomalyKinds.AsteroidCluster, "Asteroid Cluster"),
         (SensorAnomalyKinds.Comet, "Comet"),
-        (SensorAnomalyKinds.EnergyParticleWells, "Energy Particle Wells")
+        (SensorAnomalyKinds.EnergyParticleWells, "Energy Particle Wells"),
     ];
 
     public static GameWorld StartingWorld(DateTimeOffset currentTime)
     {
         var longRangeMapData = LoadLongRangeMapData();
-        var originSystem = longRangeMapData.Systems
-            .FirstOrDefault(system => system.Role == "origin")
+        var originSystem =
+            longRangeMapData.Systems.FirstOrDefault(system => system.Role == "origin")
             ?? throw new InvalidOperationException(
-                $"Long range map '{LongRangeMapPath}' must define an origin system.");
+                $"Long range map '{LongRangeMapPath}' must define an origin system."
+            );
         var shipPosition = new WorldPosition(
             originSystem.Name,
             originSystem.X,
             originSystem.Y,
-            longRangeMapData.DistanceUnit);
+            longRangeMapData.DistanceUnit
+        );
         var longRangeMap = BuildLongRangeMap(longRangeMapData, shipPosition);
 
         return new GameWorld(
@@ -48,67 +51,77 @@ public sealed record GameWorld(
                 8_000,
                 DistanceUnits.Kilometer,
                 [
-                    LocalContact(new Asteroid(
-                        "local-kite-rock",
-                        "Kite Rock",
-                        1_180,
-                        -940,
-                        DistanceUnits.Kilometer,
-                        0.72,
-                        AsteroidTypes.CType)),
-                    LocalContact(new Asteroid(
-                        "local-ice-shard",
-                        "Ice Shard",
-                        5_240,
-                        690,
-                        DistanceUnits.Kilometer,
-                        0.48,
-                        AsteroidTypes.SType)),
-                    LocalContact(new Asteroid(
-                        "local-dust-stone",
-                        "Dust Stone",
-                        -3_620,
-                        2_180,
-                        DistanceUnits.Kilometer,
-                        0.92,
-                        AsteroidTypes.MType)),
-                    LocalContact(new Asteroid(
-                        "local-silent-core",
-                        "Silent Core",
-                        820,
-                        4_360,
-                        DistanceUnits.Kilometer,
-                        0.56,
-                        AsteroidTypes.MType))
-                ]));
+                    LocalContact(
+                        new Asteroid(
+                            "local-kite-rock",
+                            "Kite Rock",
+                            1_180,
+                            -940,
+                            DistanceUnits.Kilometer,
+                            0.72,
+                            AsteroidTypes.CType
+                        )
+                    ),
+                    LocalContact(
+                        new Asteroid(
+                            "local-ice-shard",
+                            "Ice Shard",
+                            5_240,
+                            690,
+                            DistanceUnits.Kilometer,
+                            0.48,
+                            AsteroidTypes.SType
+                        )
+                    ),
+                    LocalContact(
+                        new Asteroid(
+                            "local-dust-stone",
+                            "Dust Stone",
+                            -3_620,
+                            2_180,
+                            DistanceUnits.Kilometer,
+                            0.92,
+                            AsteroidTypes.MType
+                        )
+                    ),
+                    LocalContact(
+                        new Asteroid(
+                            "local-silent-core",
+                            "Silent Core",
+                            820,
+                            4_360,
+                            DistanceUnits.Kilometer,
+                            0.56,
+                            AsteroidTypes.MType
+                        )
+                    ),
+                ]
+            )
+        );
     }
 
     private static LongRangeMapData LoadLongRangeMapData()
     {
-        var path = Path.Combine(
-            AppContext.BaseDirectory,
-            LongRangeMapPath);
+        var path = Path.Combine(AppContext.BaseDirectory, LongRangeMapPath);
 
         if (!File.Exists(path))
         {
             throw new FileNotFoundException(
                 $"Long range map data file was not found at '{path}'.",
-                path);
+                path
+            );
         }
 
         using var stream = File.OpenRead(path);
-        var longRangeMap = JsonSerializer.Deserialize<LongRangeMapData>(
-            stream,
-            JsonOptions);
+        var longRangeMap = JsonSerializer.Deserialize<LongRangeMapData>(stream, JsonOptions);
 
         return longRangeMap
             ?? throw new InvalidOperationException(
-                $"Long range map data file '{path}' could not be deserialized.");
+                $"Long range map data file '{path}' could not be deserialized."
+            );
     }
 
-    private static LongRangeMap BuildLongRangeMap(
-        LongRangeMapData data,
-        WorldPosition shipPosition)
+    private static LongRangeMap BuildLongRangeMap(LongRangeMapData data, WorldPosition shipPosition)
     {
         return new LongRangeMap(
             data.Id,
@@ -116,8 +129,7 @@ public sealed record GameWorld(
             data.Width,
             data.Height,
             data.DistanceUnit,
-            data.Systems
-                .Select(system => new StellarSystem(
+            data.Systems.Select(system => new StellarSystem(
                     system.Id,
                     system.Name,
                     system.Role,
@@ -128,14 +140,17 @@ public sealed record GameWorld(
                     DistanceBetween(shipPosition.X, shipPosition.Y, system.X, system.Y),
                     system.PlanetCountPrediction,
                     system.PlanetCountAccuracy,
-                    system.ResourceDetections))
-                .ToArray());
+                    system.ResourceDetections
+                ))
+                .ToArray()
+        );
     }
 
     private static JumpAreaMap BuildJumpAreaMap(
         LongRangeMap longRangeMap,
         WorldPosition shipPosition,
-        DateTimeOffset currentTime)
+        DateTimeOffset currentTime
+    )
     {
         var center = JumpAreaSpanLightYears / 2;
 
@@ -145,28 +160,34 @@ public sealed record GameWorld(
             JumpAreaSpanLightYears,
             JumpAreaSpanLightYears,
             longRangeMap.DistanceUnit,
-            longRangeMap.Systems
-                .Select(system => system with
-                {
-                    X = center + system.X - shipPosition.X,
-                    Y = center + system.Y - shipPosition.Y
-                })
-                .Where(system => IsInsideJumpArea(system.X, system.Y))
-                .OrderBy(system => system.Distance)
-                .ToArray(),
-            BuildDefaultSensorAnomalies(shipPosition, currentTime));
+            [
+                .. longRangeMap
+                    .Systems.Select(system =>
+                        system with
+                        {
+                            X = center + system.X - shipPosition.X,
+                            Y = center + system.Y - shipPosition.Y,
+                        }
+                    )
+                    .Where(system => IsInsideJumpArea(system.X, system.Y))
+                    .OrderBy(system => system.Distance),
+            ],
+            BuildDefaultSensorAnomalies(shipPosition, currentTime)
+        );
     }
 
     private static SensorAnomaly[] BuildDefaultSensorAnomalies(
         WorldPosition shipPosition,
-        DateTimeOffset currentTime)
+        DateTimeOffset currentTime
+    )
     {
         var random = new Random(GetJumpAreaSeed(shipPosition, currentTime));
         var anomalyCount = random.Next(5, 7);
 
-        return Enumerable.Range(1, anomalyCount)
-            .Select(index => BuildSensorAnomaly(index, random))
-            .ToArray();
+        return
+        [
+            .. Enumerable.Range(1, anomalyCount).Select(index => BuildSensorAnomaly(index, random)),
+        ];
     }
 
     private static SensorAnomaly BuildSensorAnomaly(int index, Random random)
@@ -174,34 +195,30 @@ public sealed record GameWorld(
         var center = JumpAreaSpanLightYears / 2;
         var distance = Math.Sqrt(random.NextDouble()) * JumpAreaRadiusLightYears;
         var angleRadians = random.NextDouble() * Math.Tau;
-        var anomalyType = SensorAnomalyTypes[random.Next(SensorAnomalyTypes.Length)];
+        var (Kind, Label) = SensorAnomalyTypes[random.Next(SensorAnomalyTypes.Length)];
 
         return new SensorAnomaly(
             $"jump-anomaly-{index:000}",
-            anomalyType.Kind,
-            anomalyType.Label,
+            Kind,
+            Label,
             center + (Math.Cos(angleRadians) * distance),
             center + (Math.Sin(angleRadians) * distance),
-            distance);
+            distance
+        );
     }
 
-    private static int GetJumpAreaSeed(
-        WorldPosition shipPosition,
-        DateTimeOffset currentTime)
+    private static int GetJumpAreaSeed(WorldPosition shipPosition, DateTimeOffset currentTime)
     {
         return unchecked(
-            (int)currentTime.ToUnixTimeMilliseconds() ^
-            (int)(shipPosition.X * 1_000) ^
-            (int)(shipPosition.Y * 10_000));
+            (int)currentTime.ToUnixTimeMilliseconds()
+            ^ (int)(shipPosition.X * 1_000)
+            ^ (int)(shipPosition.Y * 10_000)
+        );
     }
 
     private static bool IsInsideJumpArea(double x, double y)
     {
-        return
-            x >= 0 &&
-            x <= JumpAreaSpanLightYears &&
-            y >= 0 &&
-            y <= JumpAreaSpanLightYears;
+        return x >= 0 && x <= JumpAreaSpanLightYears && y >= 0 && y <= JumpAreaSpanLightYears;
     }
 
     private static SensorContact LocalContact(Asteroid asteroid)
@@ -219,7 +236,8 @@ public sealed record GameWorld(
             distance,
             distance / LightSpeedKilometersPerSecond,
             asteroid.MarkerScale,
-            asteroid.Type.Resources.Estimates);
+            asteroid.Type.Resources.Estimates
+        );
     }
 
     private static double DistanceFromOrigin(double x, double y)
@@ -227,11 +245,7 @@ public sealed record GameWorld(
         return Math.Sqrt((x * x) + (y * y));
     }
 
-    private static double DistanceBetween(
-        double originX,
-        double originY,
-        double x,
-        double y)
+    private static double DistanceBetween(double originX, double originY, double x, double y)
     {
         var deltaX = x - originX;
         var deltaY = y - originY;
@@ -245,7 +259,8 @@ public sealed record GameWorld(
         double Width,
         double Height,
         string DistanceUnit,
-        IReadOnlyList<StellarSystemData> Systems);
+        IReadOnlyList<StellarSystemData> Systems
+    );
 
     private sealed record StellarSystemData(
         string Id,
@@ -257,5 +272,6 @@ public sealed record GameWorld(
         double Y,
         int PlanetCountPrediction,
         double PlanetCountAccuracy,
-        IReadOnlyList<ResourceDetection> ResourceDetections);
+        IReadOnlyList<ResourceDetection> ResourceDetections
+    );
 }
