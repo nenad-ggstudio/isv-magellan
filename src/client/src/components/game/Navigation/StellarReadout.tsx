@@ -1,4 +1,5 @@
 import type { StellarSystem } from '../../../gameTypes'
+import { cx } from '../../../classNames'
 import {
   formatDistance,
   formatElapsed,
@@ -8,6 +9,30 @@ import {
   formatSystemRole,
 } from './formatters'
 import type { StellarMap } from './types'
+import {
+  detailDescription,
+  detailEyebrow,
+  detailHeader,
+  detailList,
+  detailListItem,
+  detailPanel,
+  detailTerm,
+  detailTitle,
+  emptyDetailLabel,
+  emptyDetailPanel,
+  emptyDetailValue,
+  readoutShell,
+  resourceLabel,
+  resourceList,
+  resourceListItem,
+  resourceMeta,
+  resourcePanel,
+  resourceValue,
+  scanSummary,
+  scanSummaryItem,
+  scanSummaryLabel,
+  scanSummaryValue,
+} from '../styleClasses'
 
 export function StellarReadout({
   elapsedMilliseconds,
@@ -23,74 +48,98 @@ export function StellarReadout({
   selectedSystem: StellarSystem | null
 }) {
   return (
-    <aside className="stellar-readout" aria-label="Stellar system details">
-      <div className="scan-summary">
-        <div>
-          <span>{extentLabel}</span>
-          <strong>{formatDistance(extentValue, map.distanceUnit)}</strong>
+    <aside className={readoutShell} aria-label="Stellar system details">
+      <div className={scanSummary}>
+        <div className={scanSummaryItem}>
+          <span className={scanSummaryLabel}>{extentLabel}</span>
+          <strong className={scanSummaryValue}>
+            {formatDistance(extentValue, map.distanceUnit)}
+          </strong>
         </div>
-        <div>
-          <span>Systems</span>
-          <strong>{map.systems.length}</strong>
+        <div className={scanSummaryItem}>
+          <span className={scanSummaryLabel}>Systems</span>
+          <strong className={scanSummaryValue}>{map.systems.length}</strong>
         </div>
-        <div>
-          <span>Clock</span>
-          <strong>{formatElapsed(elapsedMilliseconds)}</strong>
+        <div className={scanSummaryItem}>
+          <span className={scanSummaryLabel}>Clock</span>
+          <strong className={scanSummaryValue}>
+            {formatElapsed(elapsedMilliseconds)}
+          </strong>
         </div>
       </div>
 
       {selectedSystem ? (
-        <article className="stellar-detail">
-          <header className="stellar-detail-header">
-            <span>{formatSystemRole(selectedSystem.role)}</span>
-            <h3>{selectedSystem.name}</h3>
+        <article className={detailPanel}>
+          <header className={detailHeader}>
+            <span className={detailEyebrow}>
+              {formatSystemRole(selectedSystem.role)}
+            </span>
+            <h3 className={detailTitle}>{selectedSystem.name}</h3>
           </header>
 
-          <dl className="stellar-detail-list">
-            <div>
-              <dt>Star Type</dt>
-              <dd>{selectedSystem.starType}</dd>
+          <dl className={detailList}>
+            <div className={detailListItem}>
+              <dt className={detailTerm}>Star Type</dt>
+              <dd className={detailDescription}>{selectedSystem.starType}</dd>
             </div>
-            <div>
-              <dt>Star Size</dt>
-              <dd>{formatStarSize(selectedSystem.starSizeSolarRadii)}</dd>
+            <div className={detailListItem}>
+              <dt className={detailTerm}>Star Size</dt>
+              <dd className={detailDescription}>
+                {formatStarSize(selectedSystem.starSizeSolarRadii)}
+              </dd>
             </div>
-            <div>
-              <dt>Range</dt>
-              <dd>{formatDistance(selectedSystem.distance, map.distanceUnit)}</dd>
+            <div className={detailListItem}>
+              <dt className={detailTerm}>Range</dt>
+              <dd className={detailDescription}>
+                {formatDistance(selectedSystem.distance, map.distanceUnit)}
+              </dd>
             </div>
-            <div>
-              <dt>Planets</dt>
-              <dd>{selectedSystem.planetCountPrediction} predicted</dd>
+            <div className={detailListItem}>
+              <dt className={detailTerm}>Planets</dt>
+              <dd className={detailDescription}>
+                {selectedSystem.planetCountPrediction} predicted
+              </dd>
             </div>
-            <div>
-              <dt>Accuracy</dt>
-              <dd>{formatPercent(selectedSystem.planetCountAccuracy)}</dd>
+            <div className={detailListItem}>
+              <dt className={detailTerm}>Accuracy</dt>
+              <dd className={detailDescription}>
+                {formatPercent(selectedSystem.planetCountAccuracy)}
+              </dd>
             </div>
           </dl>
 
-          <div className="resource-detection-panel">
-            <span>Resource Signals</span>
-            <ul className="resource-detections">
+          <div className={resourcePanel}>
+            <span className={resourceLabel}>Resource Signals</span>
+            <ul className={resourceList}>
               {selectedSystem.resourceDetections.map((detection) => (
                 <li
                   data-detected={detection.detected}
+                  className={resourceListItem}
                   key={detection.resource}
                 >
-                  <span>{formatResourceName(detection.resource)}</span>
-                  <strong>
+                  <span className={resourceLabel}>
+                    {formatResourceName(detection.resource)}
+                  </span>
+                  <strong
+                    className={cx(
+                      resourceValue,
+                      detection.detected && 'text-[#e5f6ce]',
+                    )}
+                  >
                     {detection.detected ? 'Detected' : 'No signal'}
                   </strong>
-                  <small>{formatPercent(detection.confidence)}</small>
+                  <small className={resourceMeta}>
+                    {formatPercent(detection.confidence)}
+                  </small>
                 </li>
               ))}
             </ul>
           </div>
         </article>
       ) : (
-        <div className="stellar-detail stellar-detail--empty">
-          <span>Selection</span>
-          <strong>No system selected</strong>
+        <div className={cx(detailPanel, emptyDetailPanel)}>
+          <span className={emptyDetailLabel}>Selection</span>
+          <strong className={emptyDetailValue}>No system selected</strong>
         </div>
       )}
     </aside>

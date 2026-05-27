@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { cx } from '../../../classNames'
 import type { LongRangeMap } from '../../../gameTypes'
 import {
   sectorGridStepLightYears,
@@ -9,6 +10,10 @@ import { getMapDiagonal, getSectorBaseSpan } from './mapMath'
 import { StellarMapView } from './StellarMapView'
 import { StellarReadout } from './StellarReadout'
 import type { MapPosition } from './types'
+import {
+  longRangeNavigationContent,
+  navigationContent,
+} from '../styleClasses'
 
 export function LongRangeMapPanel({
   elapsedMilliseconds,
@@ -29,7 +34,7 @@ export function LongRangeMapPanel({
   )
 
   return (
-    <div className="navigation-content navigation-content--long-range-map">
+    <div className={cx(navigationContent, longRangeNavigationContent)}>
       <StellarMapView
         gizmoReferenceSpan={getSectorBaseSpan(map)}
         gridStep={sectorGridStepLightYears}

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { cx } from '../../../classNames'
 import type { JumpAreaMap } from '../../../gameTypes'
 import {
   jumpAreaGridStepLightYears,
@@ -8,6 +9,10 @@ import {
 import { getMapCenterPosition } from './mapMath'
 import { StellarMapView } from './StellarMapView'
 import { StellarReadout } from './StellarReadout'
+import {
+  longRangeNavigationContent,
+  navigationContent,
+} from '../styleClasses'
 
 export function JumpAreaMapPanel({
   elapsedMilliseconds,
@@ -29,7 +34,7 @@ export function JumpAreaMapPanel({
   )
 
   return (
-    <div className="navigation-content navigation-content--long-range-map">
+    <div className={cx(navigationContent, longRangeNavigationContent)}>
       <StellarMapView
         gizmoReferenceSpan={gizmoReferenceSpan}
         gridStep={jumpAreaGridStepLightYears}

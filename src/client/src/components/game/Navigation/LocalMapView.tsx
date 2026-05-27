@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { KeyboardEvent, WheelEvent } from 'react'
+import { cx } from '../../../classNames'
 import type { LocalMap } from '../../../gameTypes'
 import { localMapZoomMultiplier } from './constants'
 import { formatMapScale } from './formatters'
@@ -10,6 +11,12 @@ import {
   toLocalSvgPoint,
 } from './mapMath'
 import type { LocalMapContactPosition } from './types'
+import {
+  mapControlButton,
+  mapScale,
+  mapToolbar,
+  mapViewport,
+} from '../styleClasses'
 
 export function LocalMapView({
   contacts,
@@ -62,23 +69,26 @@ export function LocalMapView({
   }
 
   return (
-    <div className="local-map" aria-label={`${map.label} contacts`}>
-      <div className="stellar-map-toolbar">
+    <div className={mapViewport} aria-label={`${map.label} contacts`}>
+      <div className={mapToolbar}>
         <button
           aria-label="Zoom out"
-          className="map-control-button"
+          className={mapControlButton}
           disabled={zoomOutDisabled}
           onClick={() => changeZoom(1 / localMapZoomMultiplier)}
           type="button"
         >
           -
         </button>
-        <output aria-label="Visible radius" className="stellar-map-scale">
+        <output
+          aria-label="Visible radius"
+          className={cx(mapScale, 'min-w-[88px]')}
+        >
           R {formatMapScale(viewRadius, map.distanceUnit)}
         </output>
         <button
           aria-label="Zoom in"
-          className="map-control-button"
+          className={mapControlButton}
           disabled={zoomInDisabled}
           onClick={() => changeZoom(localMapZoomMultiplier)}
           type="button"
@@ -87,7 +97,7 @@ export function LocalMapView({
         </button>
         <button
           aria-label="Reset map view"
-          className="map-control-button"
+          className={mapControlButton}
           onClick={resetZoom}
           type="button"
         >
@@ -96,14 +106,20 @@ export function LocalMapView({
       </div>
 
       <svg
+        className="block aspect-square h-auto max-h-full w-[min(100%,620px)] max-w-full touch-none [filter:drop-shadow(0_0_24px_rgb(92_162_155_/_16%))] max-[800px]:w-[min(100%,360px)]"
         onWheel={handleWheel}
         role="img"
         viewBox={`${-viewRadius} ${-viewRadius} ${viewDiameter} ${viewDiameter}`}
       >
         <title>{map.label}</title>
-        <circle className="local-map-field" cx="0" cy="0" r={map.radius} />
         <circle
-          className="local-map-boundary"
+          className="fill-[rgb(1_3_4_/_72%)]"
+          cx="0"
+          cy="0"
+          r={map.radius}
+        />
+        <circle
+          className="fill-none stroke-[rgb(179_219_211_/_55%)] [stroke-width:0.55]"
           cx="0"
           cy="0"
           r={map.radius}
@@ -111,7 +127,7 @@ export function LocalMapView({
         />
         {rangeRadii.map((radius) => (
           <circle
-            className="local-map-range"
+            className="fill-none stroke-[rgb(129_165_161_/_25%)] [stroke-width:0.38]"
             cx="0"
             cy="0"
             key={radius}
@@ -120,20 +136,20 @@ export function LocalMapView({
           />
         ))}
         <path
-          className="local-map-axis"
+          className="fill-none stroke-[rgb(129_165_161_/_25%)] [stroke-dasharray:1.5_2] [stroke-width:0.38]"
           d={`M0 ${-map.radius}V${map.radius}M${-map.radius} 0H${map.radius}`}
           vectorEffect="non-scaling-stroke"
         />
-        <g className="local-map-ship" aria-label="Ship position">
+        <g className="pointer-events-none" aria-label="Ship position">
           <circle
-            className="stellar-ship-position-ring"
+            className="fill-none stroke-[#55d6c2]"
             cx="0"
             cy="0"
             r={shipRingRadius}
             strokeWidth={shipStrokeWidth}
           />
           <circle
-            className="stellar-ship-position-core"
+            className="fill-[#f4f7f7] stroke-[#010304]"
             cx="0"
             cy="0"
             r={shipRadius}
@@ -187,7 +203,7 @@ function LocalContactMarker({
   return (
     <g
       aria-label={`Select ${contact.contact.name}`}
-      className="local-map-contact"
+      className="group cursor-pointer text-[#b9c0b6] outline-none focus:outline-none"
       data-kind={contact.contact.kind}
       data-selected={selected}
       onClick={() => onSelectContact(contact.contact.id)}
@@ -202,14 +218,14 @@ function LocalContactMarker({
       tabIndex={0}
     >
       <circle
-        className="local-map-contact-hit-target"
+        className="fill-transparent [pointer-events:all]"
         cx={point.x}
         cy={point.y}
         r={hitRadius}
       />
       {selected && (
         <line
-          className="local-map-contact-vector"
+          className="stroke-current opacity-75 [stroke-linecap:round]"
           strokeWidth={strokeWidth}
           x1={point.x}
           x2={vectorEnd.x}
@@ -218,14 +234,17 @@ function LocalContactMarker({
         />
       )}
       <circle
-        className="local-map-contact-selection"
+        className={cx(
+          'fill-none stroke-current opacity-0 transition-opacity duration-[140ms] group-hover:opacity-90 group-focus-visible:opacity-90',
+          selected && 'opacity-90',
+        )}
         cx={point.x}
         cy={point.y}
         r={selectionRadius}
         strokeWidth={strokeWidth}
       />
       <circle
-        className="local-map-contact-dot"
+        className="fill-current stroke-[#021010]"
         cx={point.x}
         cy={point.y}
         r={glyphRadius}

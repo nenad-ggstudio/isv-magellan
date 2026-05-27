@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, WheelEvent } from 'react'
+import { cx } from '../../../classNames'
 import type { StellarSystem } from '../../../gameTypes'
 import { sectorZoomMultiplier } from './constants'
 import { formatMapScale, getSpectralType } from './formatters'
@@ -14,6 +15,12 @@ import {
   zoomSectorViewport,
 } from './mapMath'
 import type { DragState, MapPosition, StellarMap } from './types'
+import {
+  mapControlButton,
+  mapScale,
+  mapToolbar,
+  mapViewport,
+} from '../styleClasses'
 
 export function StellarMapView({
   gizmoReferenceSpan,
@@ -165,14 +172,14 @@ export function StellarMapView({
 
   return (
     <div
-      className="stellar-map"
+      className={mapViewport}
       data-dragging={dragState !== null}
       aria-label={`${map.label} stellar systems`}
     >
-      <div className="stellar-map-toolbar">
+      <div className={mapToolbar}>
         <button
           aria-label="Zoom out"
-          className="map-control-button"
+          className={mapControlButton}
           disabled={zoomOutDisabled}
           onClick={() => changeZoom(1 / sectorZoomMultiplier)}
           type="button"
@@ -181,13 +188,13 @@ export function StellarMapView({
         </button>
         <output
           aria-label="Visible map span"
-          className="stellar-map-scale"
+          className={mapScale}
         >
           {formatMapScale(viewSpan, map.distanceUnit)}
         </output>
         <button
           aria-label="Zoom in"
-          className="map-control-button"
+          className={mapControlButton}
           disabled={zoomInDisabled}
           onClick={() => changeZoom(sectorZoomMultiplier)}
           type="button"
@@ -196,7 +203,7 @@ export function StellarMapView({
         </button>
         <button
           aria-label="Reset map view"
-          className="map-control-button"
+          className={mapControlButton}
           onClick={resetViewport}
           type="button"
         >
@@ -204,7 +211,7 @@ export function StellarMapView({
         </button>
         <button
           aria-label="Center on ship at maximum zoom"
-          className="map-control-button map-control-button--ship"
+          className={cx(mapControlButton, 'w-[46px] text-[10px] tracking-normal')}
           onClick={zoomToShip}
           type="button"
         >
@@ -213,6 +220,10 @@ export function StellarMapView({
       </div>
 
       <svg
+        className={cx(
+          'block aspect-square h-auto max-h-full w-[min(100%,900px)] max-w-full cursor-grab touch-none [filter:drop-shadow(0_0_32px_rgb(172_199_193_/_10%))] max-[800px]:w-[min(100%,430px)]',
+          dragState !== null && 'cursor-grabbing',
+        )}
         onPointerCancel={handlePointerEnd}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -223,7 +234,7 @@ export function StellarMapView({
       >
         <title>{map.label}</title>
         <rect
-          className="stellar-sector-boundary"
+          className="fill-[rgb(1_3_4_/_72%)] stroke-[rgb(180_207_204_/_36%)] [stroke-width:1]"
           height={map.height}
           vectorEffect="non-scaling-stroke"
           width={map.width}
@@ -232,7 +243,10 @@ export function StellarMapView({
         />
         {gridLines.map((line) => (
           <line
-            className="stellar-sector-grid-line"
+            className={cx(
+              'stroke-[rgb(131_157_158_/_11%)] [stroke-width:1]',
+              line.major && 'stroke-[rgb(155_184_184_/_19%)]',
+            )}
             data-major={line.major}
             key={line.id}
             vectorEffect="non-scaling-stroke"
@@ -282,16 +296,16 @@ function ShipPositionMarker({
   const strokeWidth = 0.045 * markerScale
 
   return (
-    <g className="stellar-ship-position" aria-label="Ship position">
+    <g className="pointer-events-none" aria-label="Ship position">
       <circle
-        className="stellar-ship-position-ring"
+        className="fill-none stroke-[#55d6c2]"
         cx={point.x}
         cy={point.y}
         r={ringRadius}
         strokeWidth={strokeWidth}
       />
       <circle
-        className="stellar-ship-position-core"
+        className="fill-[#f4f7f7] stroke-[#010304]"
         cx={point.x}
         cy={point.y}
         r={radius}
@@ -327,7 +341,10 @@ function StellarSystemMarker({
   return (
     <g
       aria-label={system.name}
-      className="stellar-system"
+      className={cx(
+        'group cursor-pointer outline-none focus:outline-none',
+        getSpectralTypeClass(system.starType),
+      )}
       data-role={system.role}
       data-selected={selected}
       data-spectral-type={getSpectralType(system.starType)}
@@ -341,27 +358,30 @@ function StellarSystemMarker({
       tabIndex={0}
     >
       <circle
-        className="stellar-system-hit-target"
+        className="fill-transparent [pointer-events:all]"
         cx={point.x}
         cy={point.y}
         r={hitTargetRadius}
       />
       <circle
-        className="stellar-system-hover"
+        className="fill-none stroke-current opacity-0 transition-opacity duration-[140ms] group-hover:opacity-[0.78] group-focus-visible:opacity-[0.78]"
         cx={point.x}
         cy={point.y}
         r={hoverRadius}
         strokeWidth={markerStrokeWidth}
       />
       <circle
-        className="stellar-system-selection"
+        className={cx(
+          'fill-none stroke-current opacity-0 transition-opacity duration-[140ms]',
+          selected && 'opacity-90',
+        )}
         cx={point.x}
         cy={point.y}
         r={selectionRadius}
         strokeWidth={markerStrokeWidth}
       />
       <circle
-        className="stellar-system-dot"
+        className="fill-current stroke-[#010304]"
         cx={point.x}
         cy={point.y}
         r={dotRadius}
@@ -369,6 +389,27 @@ function StellarSystemMarker({
       />
     </g>
   )
+}
+
+function getSpectralTypeClass(starType: string) {
+  switch (getSpectralType(starType)) {
+    case 'o':
+      return 'text-[#9fbdff]'
+    case 'b':
+      return 'text-[#b7ccff]'
+    case 'a':
+      return 'text-[#f1f6ff]'
+    case 'f':
+      return 'text-[#fff0bc]'
+    case 'g':
+      return 'text-[#ffd96a]'
+    case 'k':
+      return 'text-[#ffad5b]'
+    case 'm':
+      return 'text-[#ff755f]'
+    default:
+      return 'text-[#d8e0df]'
+  }
 }
 
 function selectSystemFromKeyboard(

@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import './App.css'
 import { GamePage } from './components/GamePage'
 import { LandingPage } from './components/LandingPage'
 import { useGameStore } from './stores/gameStore'

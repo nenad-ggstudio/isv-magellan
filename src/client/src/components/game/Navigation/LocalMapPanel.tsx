@@ -3,6 +3,7 @@ import type { LocalMap } from '../../../gameTypes'
 import { LocalMapReadout } from './LocalMapReadout'
 import { LocalMapView } from './LocalMapView'
 import { getLiveLocalMapContact } from './mapMath'
+import { navigationContent } from '../styleClasses'
 
 export function LocalMapPanel({
   elapsedMilliseconds,
@@ -27,7 +28,7 @@ export function LocalMapPanel({
     null
 
   return (
-    <div className="navigation-content">
+    <div className={navigationContent}>
       <LocalMapView
         contacts={contacts}
         map={map}
