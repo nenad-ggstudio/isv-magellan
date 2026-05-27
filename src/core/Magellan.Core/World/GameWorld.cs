@@ -8,7 +8,7 @@ public sealed record GameWorld(
     DateTimeOffset CurrentTime,
     LongRangeMap LongRangeMap,
     JumpAreaMap JumpAreaMap,
-    SensorScan LocalSectorScan
+    LocalMap LocalMap
 )
 {
     private const string LongRangeMapPath = "World/Data/long-range-map.json";
@@ -16,12 +16,24 @@ public sealed record GameWorld(
     private const double LightSpeedKilometersPerSecond = 299_792.458;
     private const double JumpAreaSpanLightYears = 2;
     private const double JumpAreaRadiusLightYears = JumpAreaSpanLightYears / 2;
+    private const double LocalMapRadiusKilometers = 10_000;
+    private const double LocalAsteroidInnerRadiusKilometers = 750;
+    private const double LocalAsteroidMinimumSpeedKilometersPerSecond = 0.2;
+    private const double LocalAsteroidMaximumSpeedKilometersPerSecond = 1.4;
+    private const int MinimumLocalAsteroidCount = 12;
+    private const int MaximumLocalAsteroidCount = 18;
     private static readonly (string Kind, string Label)[] SensorAnomalyTypes =
     [
         (SensorAnomalyKinds.RoguePlanet, "Rogue Planet"),
         (SensorAnomalyKinds.AsteroidCluster, "Asteroid Cluster"),
         (SensorAnomalyKinds.Comet, "Comet"),
         (SensorAnomalyKinds.EnergyParticleWells, "Energy Particle Wells"),
+    ];
+    private static readonly AsteroidType[] LocalAsteroidTypes =
+    [
+        AsteroidTypes.CType,
+        AsteroidTypes.SType,
+        AsteroidTypes.MType,
     ];
 
     public static GameWorld StartingWorld(DateTimeOffset currentTime)
@@ -45,58 +57,7 @@ public sealed record GameWorld(
             currentTime,
             longRangeMap,
             BuildJumpAreaMap(longRangeMap, shipPosition, currentTime),
-            new SensorScan(
-                "local-sector",
-                "Local Sector Sensors",
-                8_000,
-                DistanceUnits.Kilometer,
-                [
-                    LocalContact(
-                        new Asteroid(
-                            "local-kite-rock",
-                            "Kite Rock",
-                            1_180,
-                            -940,
-                            DistanceUnits.Kilometer,
-                            0.72,
-                            AsteroidTypes.CType
-                        )
-                    ),
-                    LocalContact(
-                        new Asteroid(
-                            "local-ice-shard",
-                            "Ice Shard",
-                            5_240,
-                            690,
-                            DistanceUnits.Kilometer,
-                            0.48,
-                            AsteroidTypes.SType
-                        )
-                    ),
-                    LocalContact(
-                        new Asteroid(
-                            "local-dust-stone",
-                            "Dust Stone",
-                            -3_620,
-                            2_180,
-                            DistanceUnits.Kilometer,
-                            0.92,
-                            AsteroidTypes.MType
-                        )
-                    ),
-                    LocalContact(
-                        new Asteroid(
-                            "local-silent-core",
-                            "Silent Core",
-                            820,
-                            4_360,
-                            DistanceUnits.Kilometer,
-                            0.56,
-                            AsteroidTypes.MType
-                        )
-                    ),
-                ]
-            )
+            BuildLocalMap(shipPosition, currentTime)
         );
     }
 
@@ -221,11 +182,100 @@ public sealed record GameWorld(
         return x >= 0 && x <= JumpAreaSpanLightYears && y >= 0 && y <= JumpAreaSpanLightYears;
     }
 
-    private static SensorContact LocalContact(Asteroid asteroid)
+    private static LocalMap BuildLocalMap(
+        WorldPosition shipPosition,
+        DateTimeOffset currentTime
+    )
+    {
+        var random = new Random(GetLocalMapSeed(shipPosition, currentTime));
+        var asteroidCount = random.Next(
+            MinimumLocalAsteroidCount,
+            MaximumLocalAsteroidCount + 1
+        );
+        var typeCounts = LocalAsteroidTypes.ToDictionary(type => type.Id, _ => 0);
+
+        return new LocalMap(
+            "local-map",
+            "Local Map",
+            LocalMapRadiusKilometers,
+            DistanceUnits.Kilometer,
+            Enumerable.Range(1, asteroidCount)
+                .Select(index => LocalContact(BuildLocalAsteroid(index, random, typeCounts)))
+                .OrderBy(contact => contact.Distance)
+                .ToArray()
+        );
+    }
+
+    private static Asteroid BuildLocalAsteroid(
+        int index,
+        Random random,
+        Dictionary<string, int> typeCounts
+    )
+    {
+        var asteroidType =
+            index <= LocalAsteroidTypes.Length
+                ? LocalAsteroidTypes[index - 1]
+                : LocalAsteroidTypes[random.Next(LocalAsteroidTypes.Length)];
+        var typeIndex = typeCounts[asteroidType.Id] + 1;
+        typeCounts[asteroidType.Id] = typeIndex;
+        var typeCode = GetAsteroidTypeCode(asteroidType);
+        var distance = RandomDistanceInAnnulus(
+            random,
+            LocalAsteroidInnerRadiusKilometers,
+            LocalMapRadiusKilometers
+        );
+        var angleRadians = random.NextDouble() * Math.Tau;
+        var speed = RandomDouble(
+            random,
+            LocalAsteroidMinimumSpeedKilometersPerSecond,
+            LocalAsteroidMaximumSpeedKilometersPerSecond
+        );
+
+        return new Asteroid(
+            $"local-{typeCode.ToLowerInvariant()}-type-{typeIndex:00}",
+            $"{typeCode}-Type {typeIndex:00}",
+            Math.Sin(angleRadians) * distance,
+            Math.Cos(angleRadians) * distance,
+            DistanceUnits.Kilometer,
+            Math.Round(speed, 2),
+            random.Next(0, 360),
+            asteroidType
+        );
+    }
+
+    private static double RandomDistanceInAnnulus(
+        Random random,
+        double innerRadius,
+        double outerRadius
+    )
+    {
+        var innerArea = innerRadius * innerRadius;
+        var outerArea = outerRadius * outerRadius;
+
+        return Math.Sqrt(RandomDouble(random, innerArea, outerArea));
+    }
+
+    private static double RandomDouble(Random random, double minimum, double maximum)
+    {
+        return minimum + ((maximum - minimum) * random.NextDouble());
+    }
+
+    private static string GetAsteroidTypeCode(AsteroidType asteroidType)
+    {
+        return asteroidType.Id switch
+        {
+            "c-type" => "C",
+            "s-type" => "S",
+            "m-type" => "M",
+            _ => "X",
+        };
+    }
+
+    private static LocalMapContact LocalContact(Asteroid asteroid)
     {
         var distance = DistanceFromOrigin(asteroid.X, asteroid.Y);
 
-        return new SensorContact(
+        return new LocalMapContact(
             asteroid.Id,
             asteroid.Name,
             asteroid.Kind,
@@ -235,7 +285,8 @@ public sealed record GameWorld(
             asteroid.Y,
             distance,
             distance / LightSpeedKilometersPerSecond,
-            asteroid.MarkerScale,
+            asteroid.SpeedKilometersPerSecond,
+            asteroid.DirectionDegrees,
             asteroid.Type.Resources.Estimates
         );
     }
@@ -243,6 +294,16 @@ public sealed record GameWorld(
     private static double DistanceFromOrigin(double x, double y)
     {
         return Math.Sqrt((x * x) + (y * y));
+    }
+
+    private static int GetLocalMapSeed(WorldPosition shipPosition, DateTimeOffset currentTime)
+    {
+        return unchecked(
+            (int)currentTime.ToUnixTimeMilliseconds()
+            ^ (int)(shipPosition.X * 31_000)
+            ^ (int)(shipPosition.Y * 17_000)
+            ^ 0x4C4F434C
+        );
     }
 
     private static double DistanceBetween(double originX, double originY, double x, double y)

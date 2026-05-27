@@ -83,7 +83,7 @@ export type ResourceEstimate = {
   label: string
 }
 
-export type SensorContact = {
+export type LocalMapContact = {
   id: string
   name: string
   kind: 'asteroid'
@@ -93,16 +93,17 @@ export type SensorContact = {
   y: number
   distance: number
   signalAgeSeconds: number
-  markerScale: number
+  speedKilometersPerSecond: number
+  directionDegrees: number
   resourceEstimates: ResourceEstimate[]
 }
 
-export type SensorScan = {
-  id: 'local-sector'
+export type LocalMap = {
+  id: 'local-map'
   label: string
   radius: number
   distanceUnit: DistanceUnit
-  contacts: SensorContact[]
+  contacts: LocalMapContact[]
 }
 
 export type StellarSystemRole = 'origin' | 'waypoint' | 'destination'
@@ -166,7 +167,7 @@ export type GameWorld = {
   currentTime: string
   longRangeMap: LongRangeMap
   jumpAreaMap: JumpAreaMap
-  localSectorScan: SensorScan
+  localMap: LocalMap
 }
 
 export type ActiveGameState = {

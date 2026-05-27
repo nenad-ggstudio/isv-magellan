@@ -5,8 +5,7 @@ public abstract record SpaceObject(
     string Name,
     double X,
     double Y,
-    string DistanceUnit,
-    double MarkerScale)
+    string DistanceUnit)
 {
     public abstract string Kind { get; }
 }

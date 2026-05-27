@@ -148,15 +148,32 @@ public sealed class GameManagerTests
                 Assert.InRange(anomaly.Distance, 0, world.JumpAreaMap.Width / 2);
             });
 
-        Assert.Equal("local-sector", world.LocalSectorScan.Id);
-        Assert.Equal(DistanceUnits.Kilometer, world.LocalSectorScan.DistanceUnit);
-        Assert.Equal(8_000, world.LocalSectorScan.Radius);
-        Assert.Equal(4, world.LocalSectorScan.Contacts.Count);
+        Assert.Equal("local-map", world.LocalMap.Id);
+        Assert.Equal("Local Map", world.LocalMap.Label);
+        Assert.Equal(DistanceUnits.Kilometer, world.LocalMap.DistanceUnit);
+        Assert.Equal(10_000, world.LocalMap.Radius);
+        Assert.InRange(world.LocalMap.Contacts.Count, 12, 18);
+        Assert.Equal(
+            world.LocalMap.Contacts.Count,
+            world.LocalMap.Contacts.Select(contact => contact.Id).Distinct().Count());
+        Assert.Contains(
+            world.LocalMap.Contacts,
+            contact => contact.AsteroidTypeId == AsteroidTypes.CType.Id);
+        Assert.Contains(
+            world.LocalMap.Contacts,
+            contact => contact.AsteroidTypeId == AsteroidTypes.SType.Id);
+        Assert.Contains(
+            world.LocalMap.Contacts,
+            contact => contact.AsteroidTypeId == AsteroidTypes.MType.Id);
         Assert.All(
-            world.LocalSectorScan.Contacts,
+            world.LocalMap.Contacts,
             contact =>
             {
                 Assert.Equal(Asteroid.ObjectKind, contact.Kind);
+                Assert.Matches("^[CSM]-Type [0-9]{2}$", contact.Name);
+                Assert.InRange(contact.Distance, 0, world.LocalMap.Radius);
+                Assert.True(contact.SpeedKilometersPerSecond > 0);
+                Assert.InRange(contact.DirectionDegrees, 0, 360);
                 Assert.Equal(3, contact.ResourceEstimates.Count);
                 Assert.Contains(
                     contact.ResourceEstimates,
@@ -170,17 +187,33 @@ public sealed class GameManagerTests
             });
 
         Assert.All(
-            world.LocalSectorScan.Contacts,
+            world.LocalMap.Contacts,
             contact => Assert.True(contact.SignalAgeSeconds > 0));
 
         Assert.Contains(
-            world.LocalSectorScan.Contacts,
+            world.LocalMap.Contacts,
             contact =>
                 contact.AsteroidTypeId == AsteroidTypes.MType.Id &&
                 contact.ResourceEstimates.Any(
                     estimate =>
                         estimate.Resource == ResourceNames.Lithium &&
                         estimate.Label == "lots"));
+    }
+
+    [Fact]
+    public void StartingWorld_generates_local_asteroids_from_seed()
+    {
+        var startedAt = new DateTimeOffset(2187, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var firstWorld = GameWorld.StartingWorld(startedAt);
+        var secondWorld = GameWorld.StartingWorld(startedAt);
+        var laterWorld = GameWorld.StartingWorld(startedAt.AddMilliseconds(1));
+
+        Assert.Equal(
+            firstWorld.LocalMap.Contacts.Select(contact => (contact.Id, contact.X, contact.Y)),
+            secondWorld.LocalMap.Contacts.Select(contact => (contact.Id, contact.X, contact.Y)));
+        Assert.NotEqual(
+            firstWorld.LocalMap.Contacts.Select(contact => (contact.Id, contact.X, contact.Y)),
+            laterWorld.LocalMap.Contacts.Select(contact => (contact.Id, contact.X, contact.Y)));
     }
 
     private static GameManager CreateManager(IGameEventStore store)

@@ -1,8 +1,8 @@
 namespace World;
 
-public sealed record SensorScan(
+public sealed record LocalMap(
     string Id,
     string Label,
     double Radius,
     string DistanceUnit,
-    IReadOnlyList<SensorContact> Contacts);
+    IReadOnlyList<LocalMapContact> Contacts);

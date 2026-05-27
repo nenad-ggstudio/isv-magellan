@@ -1,6 +1,6 @@
 namespace World;
 
-public sealed record SensorContact(
+public sealed record LocalMapContact(
     string Id,
     string Name,
     string Kind,
@@ -10,5 +10,6 @@ public sealed record SensorContact(
     double Y,
     double Distance,
     double SignalAgeSeconds,
-    double MarkerScale,
+    double SpeedKilometersPerSecond,
+    double DirectionDegrees,
     IReadOnlyList<ResourceEstimate> ResourceEstimates);

@@ -137,8 +137,8 @@ public sealed class FileGameEventStoreTests
             expectedGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Kind),
             actualGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Kind));
         Assert.Equal(
-            expectedGame.World.LocalSectorScan.Contacts.Select(contact => contact.Id),
-            actualGame.World.LocalSectorScan.Contacts.Select(contact => contact.Id));
+            expectedGame.World.LocalMap.Contacts.Select(contact => contact.Id),
+            actualGame.World.LocalMap.Contacts.Select(contact => contact.Id));
     }
 
     [Fact]

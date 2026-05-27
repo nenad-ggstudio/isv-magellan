@@ -8,8 +8,9 @@ public sealed record Asteroid(
     double X,
     double Y,
     string DistanceUnit,
-    double MarkerScale,
-    AsteroidType Type) : SpaceObject(Id, Name, X, Y, DistanceUnit, MarkerScale)
+    double SpeedKilometersPerSecond,
+    double DirectionDegrees,
+    AsteroidType Type) : SpaceObject(Id, Name, X, Y, DistanceUnit)
 {
     public const string ObjectKind = "asteroid";
 
