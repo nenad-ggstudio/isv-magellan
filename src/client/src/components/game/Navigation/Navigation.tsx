@@ -11,7 +11,6 @@ import { panelHeading, panelLabel } from '../styleClasses'
 type NavigationProps = {
   elapsedMilliseconds: number
   gravityScanner: GravityScanner
-  onDebug: (message: string) => void
   onStartGravityScan: () => Promise<void>
   tick: number
   world: GameWorld
@@ -20,7 +19,6 @@ type NavigationProps = {
 export function Navigation({
   elapsedMilliseconds,
   gravityScanner,
-  onDebug,
   onStartGravityScan,
   tick,
   world,
@@ -72,7 +70,6 @@ export function Navigation({
           <LongRangeMapPanel
             elapsedMilliseconds={elapsedMilliseconds}
             map={world.longRangeMap}
-            onDebug={onDebug}
             onSelectSystem={setSelectedSystemId}
             selectedSystemId={selectedSystemId}
             shipPosition={world.shipPosition}
@@ -83,7 +80,6 @@ export function Navigation({
             gizmoReferenceSpan={getSectorBaseSpan(world.longRangeMap)}
             gravityScanner={gravityScanner}
             map={world.jumpAreaMap}
-            onDebug={onDebug}
             onSelectSystem={setSelectedSystemId}
             onStartGravityScan={onStartGravityScan}
             selectedSystemId={selectedSystemId}

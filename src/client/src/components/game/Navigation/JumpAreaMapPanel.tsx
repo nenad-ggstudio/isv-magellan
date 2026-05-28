@@ -19,7 +19,6 @@ export function JumpAreaMapPanel({
   gizmoReferenceSpan,
   gravityScanner,
   map,
-  onDebug,
   onSelectSystem,
   onStartGravityScan,
   selectedSystemId,
@@ -29,7 +28,6 @@ export function JumpAreaMapPanel({
   gizmoReferenceSpan: number
   gravityScanner: GravityScanner
   map: JumpAreaMap
-  onDebug: (message: string) => void
   onSelectSystem: (systemId: string) => void
   onStartGravityScan: () => Promise<void>
   selectedSystemId: string | null
@@ -66,7 +64,6 @@ export function JumpAreaMapPanel({
         map={map}
         majorGridStep={jumpAreaMajorGridStepLightYears}
         minimumViewSpan={jumpAreaMinimumViewLightYears}
-        onDebug={onDebug}
         onSelectSystem={onSelectSystem}
         selectedSystemId={selectedSystemId}
         shipPosition={shipPosition}

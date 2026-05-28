@@ -32,7 +32,6 @@ export function StellarMapView({
   map,
   majorGridStep,
   minimumViewSpan,
-  onDebug,
   onSelectSystem,
   selectedSystemId,
   shipPosition,
@@ -43,7 +42,6 @@ export function StellarMapView({
   map: StellarMap
   majorGridStep: number
   minimumViewSpan: number
-  onDebug: (message: string) => void
   onSelectSystem: (systemId: string) => void
   selectedSystemId: string | null
   shipPosition: MapPosition
@@ -313,7 +311,6 @@ export function StellarMapView({
           <StellarSystemMarker
             key={system.id}
             map={map}
-            onDebug={onDebug}
             onSelectSystem={onSelectSystem}
             selected={system.id === selectedSystemId}
             system={system}
@@ -454,7 +451,6 @@ function ShipPositionMarker({
 function StellarSystemMarker({
   gizmoReferenceSpan,
   map,
-  onDebug,
   onSelectSystem,
   selected,
   system,
@@ -463,7 +459,6 @@ function StellarSystemMarker({
 }: {
   gizmoReferenceSpan: number
   map: StellarMap
-  onDebug: (message: string) => void
   onSelectSystem: (systemId: string) => void
   selected: boolean
   system: StellarSystem
@@ -477,9 +472,6 @@ function StellarSystemMarker({
   const hoverRadius = 0.2 * markerScale
   const selectionRadius = 0.25 * markerScale
   const markerStrokeWidth = 0.04 * markerScale
-  const debugBoundsRadius =
-    Math.max(dotRadius, hitTargetRadius, hoverRadius, selectionRadius) +
-    markerStrokeWidth
 
   return (
     <g
@@ -491,89 +483,24 @@ function StellarSystemMarker({
       data-role={system.role}
       data-selected={selected}
       data-spectral-type={getSpectralType(system.starType)}
-      onPointerEnter={() =>
-        onDebug(
-          buildStellarSystemDebugLine(
-            'g enter',
-            system,
-            map,
-            point,
-            markerScale,
-            hitTargetRadius,
-            hoverRadius,
-            selectionRadius,
-            svgUnitsPerPixel,
-          ),
-        )
-      }
-      onPointerLeave={() =>
-        onDebug(
-          buildStellarSystemDebugLine(
-            'g leave',
-            system,
-            map,
-            point,
-            markerScale,
-            hitTargetRadius,
-            hoverRadius,
-            selectionRadius,
-            svgUnitsPerPixel,
-          ),
-        )
-      }
       onKeyDown={(event) =>
         selectSystemFromKeyboard(event, system, onSelectSystem)
       }
       role="button"
       tabIndex={0}
     >
-      <rect
-        className="pointer-events-none fill-none stroke-[#ff4fd8] opacity-90 [stroke-dasharray:4_3] [stroke-width:1]"
-        data-debug="stellar-system-g-border"
-        height={debugBoundsRadius * 2}
-        vectorEffect="non-scaling-stroke"
-        width={debugBoundsRadius * 2}
-        x={point.x - debugBoundsRadius}
-        y={point.y - debugBoundsRadius}
-      />
       <circle
-        className="peer cursor-pointer fill-transparent stroke-[#65ff86] [pointer-events:all] [stroke-width:1]"
+        className="peer cursor-pointer [pointer-events:all]"
         cx={point.x}
         cy={point.y}
+        fill="#ffffff"
+        fillOpacity="0.001"
         onClick={() => onSelectSystem(system.id)}
         onMouseDown={(event) => event.preventDefault()}
-        onPointerEnter={() =>
-          onDebug(
-            buildStellarSystemDebugLine(
-              'hit enter',
-              system,
-              map,
-              point,
-              markerScale,
-              hitTargetRadius,
-              hoverRadius,
-              selectionRadius,
-              svgUnitsPerPixel,
-            ),
-          )
-        }
-        onPointerLeave={() =>
-          onDebug(
-            buildStellarSystemDebugLine(
-              'hit leave',
-              system,
-              map,
-              point,
-              markerScale,
-              hitTargetRadius,
-              hoverRadius,
-              selectionRadius,
-              svgUnitsPerPixel,
-            ),
-          )
-        }
         onPointerDown={(event) => event.stopPropagation()}
         r={hitTargetRadius}
+        stroke="#ffffff"
+        strokeOpacity="0.001"
         vectorEffect="non-scaling-stroke"
       />
       <circle
@@ -623,40 +550,6 @@ function getSpectralTypeClass(starType: string) {
     default:
       return 'text-[#d8e0df]'
   }
-}
-
-function buildStellarSystemDebugLine(
-  eventName: string,
-  system: StellarSystem,
-  map: StellarMap,
-  point: MapPosition,
-  markerScale: number,
-  hitTargetRadius: number,
-  hoverRadius: number,
-  selectionRadius: number,
-  svgUnitsPerPixel: number,
-) {
-  return [
-    `${eventName}: ${system.name}`,
-    `map=${map.id}`,
-    `system=(${formatDebugNumber(system.x)}, ${formatDebugNumber(system.y)})`,
-    `svg=(${formatDebugNumber(point.x)}, ${formatDebugNumber(point.y)})`,
-    `markerScale=${formatDebugNumber(markerScale)}`,
-    `hitR=${formatDebugRadius(hitTargetRadius, svgUnitsPerPixel)}`,
-    `hoverR=${formatDebugRadius(hoverRadius, svgUnitsPerPixel)}`,
-    `selectR=${formatDebugRadius(selectionRadius, svgUnitsPerPixel)}`,
-    `svgUnit/px=${formatDebugNumber(svgUnitsPerPixel)}`,
-  ].join(' | ')
-}
-
-function formatDebugRadius(radius: number, svgUnitsPerPixel: number) {
-  const pixelRadius = radius / Math.max(svgUnitsPerPixel, 0.000001)
-
-  return `${formatDebugNumber(radius)} map, ${formatDebugNumber(pixelRadius)} px`
-}
-
-function formatDebugNumber(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(4)
 }
 
 function selectSystemFromKeyboard(

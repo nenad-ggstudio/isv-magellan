@@ -18,14 +18,12 @@ import {
 export function LongRangeMapPanel({
   elapsedMilliseconds,
   map,
-  onDebug,
   onSelectSystem,
   selectedSystemId,
   shipPosition,
 }: {
   elapsedMilliseconds: number
   map: LongRangeMap
-  onDebug: (message: string) => void
   onSelectSystem: (systemId: string) => void
   selectedSystemId: string | null
   shipPosition: MapPosition
@@ -44,7 +42,6 @@ export function LongRangeMapPanel({
         map={map}
         majorGridStep={sectorMajorGridStepLightYears}
         minimumViewSpan={sectorMinimumViewLightYears}
-        onDebug={onDebug}
         onSelectSystem={onSelectSystem}
         selectedSystemId={selectedSystemId}
         shipPosition={shipPosition}
