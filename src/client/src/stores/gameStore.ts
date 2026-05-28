@@ -19,6 +19,7 @@ type GameStore = {
   connect: () => Promise<void>
   disconnect: () => Promise<void>
   startNewGame: () => Promise<void>
+  startGravityScan: () => Promise<void>
 }
 
 let connection: HubConnection | null = null
@@ -123,6 +124,12 @@ export const useGameStore = create<GameStore>((set) => ({
     if (connection?.state === HubConnectionState.Connected) {
       set({ tick: initialTick })
       await connection.invoke('StartNewGame')
+    }
+  },
+
+  startGravityScan: async () => {
+    if (connection?.state === HubConnectionState.Connected) {
+      await connection.invoke('StartGravityScan')
     }
   },
 }))

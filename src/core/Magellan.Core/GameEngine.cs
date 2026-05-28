@@ -19,6 +19,13 @@ public sealed class GameEngine(
         sessions.TryRemove(connectionId, out _);
     }
 
+    public long GetCurrentTick(string connectionId)
+    {
+        return sessions.TryGetValue(connectionId, out var session)
+            ? session.CurrentTick
+            : 0;
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TickRate);
@@ -63,6 +70,8 @@ public sealed class GameEngine(
     private sealed class GameSession(DateTimeOffset startedAt)
     {
         private long tick;
+
+        public long CurrentTick => Interlocked.Read(ref tick);
 
         public GameTick NextTick(DateTimeOffset now)
         {

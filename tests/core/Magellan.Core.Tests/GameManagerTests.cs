@@ -94,6 +94,13 @@ public sealed class GameManagerTests
         Assert.Equal(4_550, batteryBank.MaxCapacityKilowattHours, precision: 3);
         Assert.Equal(3_367, batteryBank.StoredKilowattHours, precision: 3);
 
+        var gravityScanner = ship.Scanners.GravityScanner;
+
+        Assert.Equal("gravity-scanner", gravityScanner.Id);
+        Assert.Equal("Gravity Scanner", gravityScanner.Label);
+        Assert.Equal(40, gravityScanner.ScanDurationTicks);
+        Assert.Null(gravityScanner.CurrentScan);
+
         var world = activeGame.World;
 
         Assert.Equal("Solar System", world.ShipPosition.Label);
@@ -201,6 +208,61 @@ public sealed class GameManagerTests
     }
 
     [Fact]
+    public async Task StartGravityScanAsync_publishes_scanner_scan_with_heat_map()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartGravityScanAsync("connection-1");
+
+        var events = await ReadAll(store);
+        var scanEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        var scanner = scanEvent.State.Game?.Ship.Scanners.GravityScanner;
+
+        Assert.NotNull(scanner);
+
+        var currentScan = scanner!.CurrentScan;
+
+        Assert.NotNull(currentScan);
+        Assert.Equal(0, currentScan!.StartedAtTick);
+        Assert.Equal(40, currentScan.CompletesAtTick);
+        Assert.Equal(0, currentScan.Result.GeneratedAtTick);
+        Assert.InRange(currentScan.Result.NoiseLevel, 0, 1);
+        Assert.Equal(192, currentScan.Result.HeatMap.Columns);
+        Assert.Equal(192, currentScan.Result.HeatMap.Rows);
+        Assert.Equal(2, currentScan.Result.HeatMap.Width);
+        Assert.Equal(2, currentScan.Result.HeatMap.Height);
+        Assert.Equal(192 * 192, currentScan.Result.HeatMap.Values.Count);
+        Assert.All(
+            currentScan.Result.HeatMap.Values,
+            value => Assert.InRange(value, 0, 1));
+        Assert.Contains(
+            currentScan.Result.HeatMap.Values,
+            value => value > 0.8);
+
+        var heatMap = currentScan.Result.HeatMap;
+        var centerIndex = ((heatMap.Rows / 2) * heatMap.Columns) + (heatMap.Columns / 2);
+
+        Assert.True(heatMap.Values[centerIndex] > heatMap.Values[0]);
+    }
+
+    [Fact]
+    public async Task StartGravityScanAsync_does_not_restart_active_scan()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartGravityScanAsync("connection-1");
+        await manager.StartGravityScanAsync("connection-1");
+
+        var events = await ReadAll(store);
+
+        Assert.Equal(2, events.Count);
+    }
+
+    [Fact]
     public void StartingWorld_generates_local_asteroids_from_seed()
     {
         var startedAt = new DateTimeOffset(2187, 1, 2, 3, 4, 5, TimeSpan.Zero);
@@ -232,5 +294,17 @@ public sealed class GameManagerTests
         }
 
         throw new InvalidOperationException("The event store did not return an event.");
+    }
+
+    private static async Task<IReadOnlyList<GameEventEnvelope>> ReadAll(IGameEventStore store)
+    {
+        var events = new List<GameEventEnvelope>();
+
+        await foreach (var envelope in store.ReadAsync())
+        {
+            events.Add(envelope);
+        }
+
+        return events;
     }
 }

@@ -29,6 +29,42 @@ public sealed class GameManager(
         gameEngine.StartNewGame(connectionId);
     }
 
+    public async Task StartGravityScanAsync(
+        string connectionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!states.TryGetValue(connectionId, out var state) || state.Game is null)
+        {
+            return;
+        }
+
+        var tick = gameEngine.GetCurrentTick(connectionId);
+        var activeGame = state.Game;
+        var scanner = activeGame.Ship.Scanners.GravityScanner;
+
+        if (scanner.IsScanInProgress(tick))
+        {
+            return;
+        }
+
+        var nextScanner = scanner.StartScan(tick, activeGame.World.JumpAreaMap);
+        var nextShip = activeGame.Ship.WithScanners(
+            activeGame.Ship.Scanners with
+            {
+                GravityScanner = nextScanner
+            });
+        var nextState = state with
+        {
+            Game = activeGame with
+            {
+                Ship = nextShip
+            }
+        };
+
+        states[connectionId] = nextState;
+        await PublishStateChanged(connectionId, nextState, cancellationToken);
+    }
+
     public void Disconnect(string connectionId)
     {
         states.TryRemove(connectionId, out _);

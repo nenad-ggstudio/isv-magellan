@@ -13,6 +13,11 @@ public sealed class GameHub(GameManager gameManager) : Hub<IGameClient>
         return gameManager.ConnectAsync(Context.ConnectionId);
     }
 
+    public Task StartGravityScan()
+    {
+        return gameManager.StartGravityScanAsync(Context.ConnectionId);
+    }
+
     public override async Task OnConnectedAsync()
     {
         await gameManager.ConnectAsync(Context.ConnectionId);

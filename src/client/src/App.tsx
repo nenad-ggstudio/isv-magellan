@@ -10,6 +10,7 @@ function App() {
   const connect = useGameStore((state) => state.connect)
   const disconnect = useGameStore((state) => state.disconnect)
   const startNewGame = useGameStore((state) => state.startNewGame)
+  const startGravityScan = useGameStore((state) => state.startGravityScan)
 
   useEffect(() => {
     void connect()
@@ -24,6 +25,7 @@ function App() {
       <GamePage
         connectionState={connectionState}
         game={gameState.game}
+        onStartGravityScan={startGravityScan}
         tick={tick}
       />
     )

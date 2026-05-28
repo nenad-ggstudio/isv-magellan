@@ -60,11 +60,44 @@ export type BatteryBank = {
   storedKilowattHours: number
 }
 
+export type GravityHeatMap = {
+  columns: number
+  rows: number
+  width: number
+  height: number
+  values: number[]
+}
+
+export type GravityScanResult = {
+  id: string
+  generatedAtTick: number
+  noiseLevel: number
+  heatMap: GravityHeatMap
+}
+
+export type GravityScannerScan = {
+  startedAtTick: number
+  completesAtTick: number
+  result: GravityScanResult
+}
+
+export type GravityScanner = {
+  id: 'gravity-scanner'
+  label: string
+  scanDurationTicks: number
+  currentScan: GravityScannerScan | null
+}
+
+export type ShipScanners = {
+  gravityScanner: GravityScanner
+}
+
 export type Ship = {
   name: string
   storageUnits: StorageUnit[]
   fusionCore: FusionCore
   batteryBank: BatteryBank
+  scanners: ShipScanners
 }
 
 export type DistanceUnit = 'lightYear' | 'kilometer'

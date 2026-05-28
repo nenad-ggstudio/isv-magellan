@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { StellarSystem } from '../../../gameTypes'
 import { cx } from '../../../classNames'
 import {
@@ -35,12 +36,14 @@ import {
 } from '../styleClasses'
 
 export function StellarReadout({
+  children,
   elapsedMilliseconds,
   extentLabel,
   extentValue,
   map,
   selectedSystem,
 }: {
+  children?: ReactNode
   elapsedMilliseconds: number
   extentLabel: string
   extentValue: number
@@ -49,23 +52,27 @@ export function StellarReadout({
 }) {
   return (
     <aside className={readoutShell} aria-label="Stellar system details">
-      <div className={scanSummary}>
-        <div className={scanSummaryItem}>
-          <span className={scanSummaryLabel}>{extentLabel}</span>
-          <strong className={scanSummaryValue}>
-            {formatDistance(extentValue, map.distanceUnit)}
-          </strong>
+      <div className="grid gap-3.5">
+        <div className={scanSummary}>
+          <div className={scanSummaryItem}>
+            <span className={scanSummaryLabel}>{extentLabel}</span>
+            <strong className={scanSummaryValue}>
+              {formatDistance(extentValue, map.distanceUnit)}
+            </strong>
+          </div>
+          <div className={scanSummaryItem}>
+            <span className={scanSummaryLabel}>Systems</span>
+            <strong className={scanSummaryValue}>{map.systems.length}</strong>
+          </div>
+          <div className={scanSummaryItem}>
+            <span className={scanSummaryLabel}>Clock</span>
+            <strong className={scanSummaryValue}>
+              {formatElapsed(elapsedMilliseconds)}
+            </strong>
+          </div>
         </div>
-        <div className={scanSummaryItem}>
-          <span className={scanSummaryLabel}>Systems</span>
-          <strong className={scanSummaryValue}>{map.systems.length}</strong>
-        </div>
-        <div className={scanSummaryItem}>
-          <span className={scanSummaryLabel}>Clock</span>
-          <strong className={scanSummaryValue}>
-            {formatElapsed(elapsedMilliseconds)}
-          </strong>
-        </div>
+
+        {children}
       </div>
 
       {selectedSystem ? (

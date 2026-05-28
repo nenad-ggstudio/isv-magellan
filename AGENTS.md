@@ -15,6 +15,9 @@ Magellan is split into a .NET backend and a Vite React client. Backend source li
 - `cd src/client && npm run build`: type-check and build the client.
 - `cd src/client && npm run lint`: run ESLint over TypeScript and React files.
 
+When you are finished with testing, STOP all the dev instances you used, DO NOT leave running dotnet or vite sessions!
+
+
 ## Coding Style & Naming Conventions
 
 C# uses nullable reference types, implicit usings, four-space indentation, PascalCase for public types/members, and camelCase for locals and parameters. Keep domain models in their current feature folders and prefer small, explicit value objects over loosely typed dictionaries. TypeScript uses two-space indentation, single quotes, extensionless relative imports, PascalCase React components, and camelCase hooks/store members. Let ESLint and TypeScript be the source of truth for client style.

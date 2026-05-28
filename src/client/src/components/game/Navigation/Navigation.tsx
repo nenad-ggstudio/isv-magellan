@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { GameWorld } from '../../../gameTypes'
+import type { GameWorld, GravityScanner } from '../../../gameTypes'
 import { navigationModes } from './constants'
 import { JumpAreaMapPanel } from './JumpAreaMapPanel'
 import { LocalMapPanel } from './LocalMapPanel'
@@ -10,10 +10,21 @@ import { panelHeading, panelLabel } from '../styleClasses'
 
 type NavigationProps = {
   elapsedMilliseconds: number
+  gravityScanner: GravityScanner
+  onDebug: (message: string) => void
+  onStartGravityScan: () => Promise<void>
+  tick: number
   world: GameWorld
 }
 
-export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
+export function Navigation({
+  elapsedMilliseconds,
+  gravityScanner,
+  onDebug,
+  onStartGravityScan,
+  tick,
+  world,
+}: NavigationProps) {
   const [mode, setMode] = useState<NavigationMode>('long-range-map')
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null)
   const [selectedLocalContactId, setSelectedLocalContactId] = useState<
@@ -61,6 +72,7 @@ export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
           <LongRangeMapPanel
             elapsedMilliseconds={elapsedMilliseconds}
             map={world.longRangeMap}
+            onDebug={onDebug}
             onSelectSystem={setSelectedSystemId}
             selectedSystemId={selectedSystemId}
             shipPosition={world.shipPosition}
@@ -69,9 +81,13 @@ export function Navigation({ elapsedMilliseconds, world }: NavigationProps) {
           <JumpAreaMapPanel
             elapsedMilliseconds={elapsedMilliseconds}
             gizmoReferenceSpan={getSectorBaseSpan(world.longRangeMap)}
+            gravityScanner={gravityScanner}
             map={world.jumpAreaMap}
+            onDebug={onDebug}
             onSelectSystem={setSelectedSystemId}
+            onStartGravityScan={onStartGravityScan}
             selectedSystemId={selectedSystemId}
+            tick={tick}
           />
         ) : (
           <LocalMapPanel
