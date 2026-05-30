@@ -18,6 +18,24 @@ public sealed class GameHub(GameManager gameManager) : Hub<IGameClient>
         return gameManager.StartGravityScanAsync(Context.ConnectionId);
     }
 
+    public Task StartEmScan(double x, double y)
+    {
+        return gameManager.StartEmScanAsync(Context.ConnectionId, x, y);
+    }
+
+    public Task CaptureEmScanReport(double focus, double filter)
+    {
+        return gameManager.CaptureEmScanReportAsync(
+            Context.ConnectionId,
+            focus,
+            filter);
+    }
+
+    public Task StopEmScan()
+    {
+        return gameManager.StopEmScanAsync(Context.ConnectionId);
+    }
+
     public override async Task OnConnectedAsync()
     {
         await gameManager.ConnectAsync(Context.ConnectionId);

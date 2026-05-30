@@ -15,8 +15,7 @@ Magellan is split into a .NET backend and a Vite React client. Backend source li
 - `cd src/client && npm run build`: type-check and build the client.
 - `cd src/client && npm run lint`: run ESLint over TypeScript and React files.
 
-When you are finished with testing, STOP all the dev instances you used, DO NOT leave running dotnet or vite sessions!
-
+You are allowed to run dev servers for internal testing, once you are done, STOP all the dev instances you used, DO NOT leave running dotnet or vite sessions.
 
 ## Coding Style & Naming Conventions
 

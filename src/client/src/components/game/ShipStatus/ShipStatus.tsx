@@ -11,17 +11,17 @@ import {
   sidePanel,
 } from '../styleClasses'
 
-const shipReadouts = [
-  ['Hull', 'Nominal'],
-  ['Reactor', '82%'],
-  ['Engines', 'Standby'],
-]
-
 type ShipStatusProps = {
   ship: Ship
 }
 
 export function ShipStatus({ ship }: ShipStatusProps) {
+  const shipReadouts = [
+    ['Hull', 'Nominal'],
+    ['Battery', formatPercentage(ship.batteryBank.chargeLevel)],
+    ['Reactor', '82%'],
+    ['Engines', 'Standby'],
+  ]
   const occupiedUnits = ship.storageUnits.filter((unit) => unit.contents).length
   const storedKilograms = ship.storageUnits.reduce(
     (total, unit) => total + (unit.contents?.quantityKilograms ?? 0),
@@ -140,6 +140,10 @@ function formatKilograms(kilograms: number) {
 
 function formatPurity(purityLevel: number) {
   return `${Math.round(purityLevel * 100)}%`
+}
+
+function formatPercentage(value: number) {
+  return `${Math.round(value * 1000) / 10}%`
 }
 
 function formatResourceName(resource: string) {

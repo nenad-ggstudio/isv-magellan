@@ -88,8 +88,74 @@ export type GravityScanner = {
   currentScan: GravityScannerScan | null
 }
 
+export type EmScanTarget = {
+  x: number
+  y: number
+}
+
+export type EmScanLockState =
+  | 'no-signal'
+  | 'weak-lock'
+  | 'partial-lock'
+  | 'stable-lock'
+
+export type EmScanConfidence =
+  | 'none'
+  | 'low'
+  | 'low-medium'
+  | 'medium'
+  | 'high'
+  | 'absolute'
+
+export type EmScanSignalProfile = {
+  noiseSeed: number
+  baseStrength: number
+  noiseLevel: number
+  focusBias: number
+  filterBias: number
+  primaryFrequency: number
+  driftFrequency: number
+  lockState: EmScanLockState
+}
+
+export type EmScannerScan = {
+  id: string
+  startedAtTick: number
+  lastPowerDrainedAtTick: number
+  target: EmScanTarget
+  radiusLightYears: number
+  signalProfile: EmScanSignalProfile
+}
+
+export type EmScanReport = {
+  id: string
+  sourceScanId: string
+  capturedAtTick: number
+  target: EmScanTarget
+  radiusLightYears: number
+  signalStrength: number
+  coherence: number
+  driftStability: number
+  estimatedSpeedKilometersPerSecond: number | null
+  estimatedAngleDegrees: number | null
+  estimatedDistortion: number | null
+  confidence: EmScanConfidence
+  lockState: EmScanLockState
+  focus: number
+  filter: number
+}
+
+export type EmScanner = {
+  id: 'em-scanner'
+  label: string
+  scanRadiusLightYears: number
+  reports: EmScanReport[]
+  currentScan: EmScannerScan | null
+}
+
 export type ShipScanners = {
   gravityScanner: GravityScanner
+  emScanner: EmScanner
 }
 
 export type Ship = {

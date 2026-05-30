@@ -11,6 +11,11 @@ function App() {
   const disconnect = useGameStore((state) => state.disconnect)
   const startNewGame = useGameStore((state) => state.startNewGame)
   const startGravityScan = useGameStore((state) => state.startGravityScan)
+  const startEmScan = useGameStore((state) => state.startEmScan)
+  const captureEmScanReport = useGameStore(
+    (state) => state.captureEmScanReport,
+  )
+  const stopEmScan = useGameStore((state) => state.stopEmScan)
 
   useEffect(() => {
     void connect()
@@ -25,7 +30,10 @@ function App() {
       <GamePage
         connectionState={connectionState}
         game={gameState.game}
+        onCaptureEmScanReport={captureEmScanReport}
+        onStartEmScan={startEmScan}
         onStartGravityScan={startGravityScan}
+        onStopEmScan={stopEmScan}
         tick={tick}
       />
     )

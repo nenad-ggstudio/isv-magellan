@@ -1,6 +1,7 @@
 using Events;
 using Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
+using Ship.Scanners;
 using World;
 using World.SpaceObjects.Asteroids;
 
@@ -101,6 +102,14 @@ public sealed class GameManagerTests
         Assert.Equal(40, gravityScanner.ScanDurationTicks);
         Assert.Null(gravityScanner.CurrentScan);
 
+        var emScanner = ship.Scanners.EmScanner;
+
+        Assert.Equal("em-scanner", emScanner.Id);
+        Assert.Equal("EM Scanner", emScanner.Label);
+        Assert.Equal(0.1, emScanner.ScanRadiusLightYears, precision: 3);
+        Assert.Empty(emScanner.Reports);
+        Assert.Null(emScanner.CurrentScan);
+
         var world = activeGame.World;
 
         Assert.Equal("Solar System", world.ShipPosition.Label);
@@ -153,6 +162,9 @@ public sealed class GameManagerTests
                 Assert.InRange(anomaly.X, 0, world.JumpAreaMap.Width);
                 Assert.InRange(anomaly.Y, 0, world.JumpAreaMap.Height);
                 Assert.InRange(anomaly.Distance, 0, world.JumpAreaMap.Width / 2);
+                Assert.InRange(anomaly.Speed, 0, 6.4);
+                Assert.InRange(anomaly.Angle, 0, Math.Tau);
+                Assert.InRange(anomaly.Distortion, 0, 1);
             });
 
         Assert.Equal("local-map", world.LocalMap.Id);
@@ -263,6 +275,246 @@ public sealed class GameManagerTests
     }
 
     [Fact]
+    public async Task StartEmScanAsync_publishes_active_scan_with_clamped_target()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartEmScanAsync("connection-1", -0.5, 3.4);
+
+        var events = await ReadAll(store);
+        var scanEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        var scanner = scanEvent.State.Game?.Ship.Scanners.EmScanner;
+
+        Assert.NotNull(scanner);
+
+        var currentScan = scanner!.CurrentScan;
+
+        Assert.NotNull(currentScan);
+        Assert.StartsWith("em-scan-", currentScan!.Id);
+        Assert.Equal(0, currentScan.StartedAtTick);
+        Assert.Equal(0, currentScan.LastPowerDrainedAtTick);
+        Assert.Equal(0, currentScan.Target.X);
+        Assert.Equal(2, currentScan.Target.Y);
+        Assert.Equal(0.1, currentScan.RadiusLightYears, precision: 3);
+        Assert.Empty(scanner.Reports);
+        Assert.InRange(currentScan.SignalProfile.BaseStrength, 0, 1);
+        Assert.InRange(currentScan.SignalProfile.NoiseLevel, 0, 1);
+    }
+
+    [Fact]
+    public async Task StartEmScanAsync_does_not_restart_active_scan()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+        await manager.StartEmScanAsync("connection-1", 1.5, 1.6);
+
+        var events = await ReadAll(store);
+
+        Assert.Equal(2, events.Count);
+    }
+
+    [Fact]
+    public async Task StopEmScanAsync_clears_active_scan()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+        await manager.StopEmScanAsync("connection-1");
+
+        var events = await ReadAll(store);
+        var scanEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        var scanner = scanEvent.State.Game?.Ship.Scanners.EmScanner;
+
+        Assert.NotNull(scanner);
+        Assert.Null(scanner!.CurrentScan);
+        Assert.Equal(3, events.Count);
+    }
+
+    [Fact]
+    public async Task CaptureEmScanReportAsync_creates_report_with_anomaly_estimates()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+
+        var newGameEvents = await ReadAll(store);
+        var newGameEvent = Assert.IsType<GameStateChangedGameEvent>(newGameEvents.Last().Event);
+        var anomaly = newGameEvent.State.Game!.World.JumpAreaMap.Anomalies[0];
+
+        await manager.StartEmScanAsync("connection-1", anomaly.X, anomaly.Y);
+        await manager.CaptureEmScanReportAsync(
+            "connection-1",
+            1 - anomaly.Distortion,
+            0.25 + (anomaly.Distortion * 0.55));
+
+        var events = await ReadAll(store);
+        var reportEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        var scanner = reportEvent.State.Game?.Ship.Scanners.EmScanner;
+        var report = Assert.Single(scanner!.Reports);
+
+        Assert.StartsWith("em-scan-", report.SourceScanId);
+        Assert.Equal(anomaly.X, report.Target.X, precision: 3);
+        Assert.Equal(anomaly.Y, report.Target.Y, precision: 3);
+        Assert.Equal(0.1, report.RadiusLightYears, precision: 3);
+        Assert.InRange(report.SignalStrength, 0, 1);
+        Assert.InRange(report.Coherence, 0, 1);
+        Assert.InRange(report.DriftStability, 0, 1);
+        Assert.NotNull(report.EstimatedSpeedKilometersPerSecond);
+        Assert.NotNull(report.EstimatedAngleDegrees);
+        Assert.NotNull(report.EstimatedDistortion);
+        Assert.True(report.EstimatedSpeedKilometersPerSecond > 0);
+        Assert.InRange(report.EstimatedAngleDegrees!.Value, 0, 360);
+        Assert.InRange(report.EstimatedDistortion!.Value, 0, 1);
+        Assert.NotEqual("none", report.Confidence);
+        Assert.NotEqual(EmScanLockStates.NoSignal, report.LockState);
+    }
+
+    [Fact]
+    public async Task CaptureEmScanReportAsync_creates_no_signal_report_without_anomaly_lock()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+
+        var newGameEvents = await ReadAll(store);
+        var newGameEvent = Assert.IsType<GameStateChangedGameEvent>(newGameEvents.Last().Event);
+        var world = newGameEvent.State.Game!.World;
+        var quietPoint = FindQuietPoint(
+            world.JumpAreaMap,
+            newGameEvent.State.Game.Ship.Scanners.EmScanner.ScanRadiusLightYears);
+
+        await manager.StartEmScanAsync("connection-1", quietPoint.X, quietPoint.Y);
+        await manager.CaptureEmScanReportAsync("connection-1", 0.5, 0.5);
+
+        var events = await ReadAll(store);
+        var reportEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        var scanner = reportEvent.State.Game?.Ship.Scanners.EmScanner;
+        var report = Assert.Single(scanner!.Reports);
+
+        Assert.Equal("none", report.Confidence);
+        Assert.Equal(EmScanLockStates.NoSignal, report.LockState);
+        Assert.Null(report.EstimatedSpeedKilometersPerSecond);
+        Assert.Null(report.EstimatedAngleDegrees);
+        Assert.Null(report.EstimatedDistortion);
+    }
+
+    [Fact]
+    public async Task ApplyTickAsync_drains_battery_for_active_em_scan_every_ten_ticks()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+        await manager.ApplyTickAsync("connection-1", new GameTick(2_500, 10));
+
+        var events = await ReadAll(store);
+        var tickEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        var activeGame = tickEvent.State.Game;
+
+        Assert.NotNull(activeGame);
+        Assert.Equal(0.739, activeGame!.Ship.BatteryBank.ChargeLevel, precision: 3);
+        Assert.Equal(
+            10,
+            activeGame.Ship.Scanners.EmScanner.CurrentScan?.LastPowerDrainedAtTick);
+    }
+
+    [Fact]
+    public async Task ApplyTickAsync_does_not_drain_battery_when_em_scan_is_inactive()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.ApplyTickAsync("connection-1", new GameTick(2_500, 10));
+
+        var events = await ReadAll(store);
+
+        Assert.Single(events);
+    }
+
+    [Fact]
+    public async Task ApplyTickAsync_catches_up_multiple_em_scan_drain_intervals()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+        await manager.ApplyTickAsync("connection-1", new GameTick(7_500, 30));
+
+        var events = await ReadAll(store);
+        var tickEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        var activeGame = tickEvent.State.Game;
+
+        Assert.NotNull(activeGame);
+        Assert.Equal(0.737, activeGame!.Ship.BatteryBank.ChargeLevel, precision: 3);
+        Assert.Equal(
+            30,
+            activeGame.Ship.Scanners.EmScanner.CurrentScan?.LastPowerDrainedAtTick);
+    }
+
+    [Fact]
+    public async Task ApplyTickAsync_stops_em_scan_when_battery_is_empty()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+        await manager.ApplyTickAsync("connection-1", new GameTick(2_000_000, 8_000));
+
+        var events = await ReadAll(store);
+        var tickEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        var activeGame = tickEvent.State.Game;
+
+        Assert.NotNull(activeGame);
+        Assert.Equal(0, activeGame!.Ship.BatteryBank.ChargeLevel);
+        Assert.Null(activeGame.Ship.Scanners.EmScanner.CurrentScan);
+    }
+
+    [Fact]
+    public async Task StartEmScanAsync_does_not_start_when_battery_is_empty()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+        await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+        await manager.ApplyTickAsync("connection-1", new GameTick(2_000_000, 8_000));
+        await manager.StartEmScanAsync("connection-1", 1.2, 1.4);
+
+        var events = await ReadAll(store);
+
+        Assert.Equal(3, events.Count);
+    }
+
+    [Fact]
+    public async Task ClientGameStateProjection_hides_raw_anomaly_data()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+
+        var envelope = await ReadSingle(store);
+        var gameEvent = Assert.IsType<GameStateChangedGameEvent>(envelope.Event);
+        var projectedState = ClientGameStateProjection.ForClient(gameEvent.State);
+
+        Assert.NotEmpty(gameEvent.State.Game!.World.JumpAreaMap.Anomalies);
+        Assert.Empty(projectedState.Game!.World.JumpAreaMap.Anomalies);
+    }
+
+    [Fact]
     public void StartingWorld_generates_local_asteroids_from_seed()
     {
         var startedAt = new DateTimeOffset(2187, 1, 2, 3, 4, 5, TimeSpan.Zero);
@@ -284,6 +536,37 @@ public sealed class GameManagerTests
         var gameEngine = new GameEngine(bus, NullLogger<GameEngine>.Instance);
 
         return new GameManager(bus, gameEngine, NullLogger<GameManager>.Instance);
+    }
+
+    private static (double X, double Y) FindQuietPoint(
+        JumpAreaMap map,
+        double radiusLightYears)
+    {
+        for (var xStep = 0; xStep <= 20; xStep++)
+        {
+            for (var yStep = 0; yStep <= 20; yStep++)
+            {
+                var x = xStep / 10.0;
+                var y = yStep / 10.0;
+                var clear = map.Anomalies.All(anomaly =>
+                    DistanceBetween(x, y, anomaly.X, anomaly.Y) > radiusLightYears);
+
+                if (clear)
+                {
+                    return (x, y);
+                }
+            }
+        }
+
+        throw new InvalidOperationException("The generated map has no quiet EM scan point.");
+    }
+
+    private static double DistanceBetween(double x1, double y1, double x2, double y2)
+    {
+        var deltaX = x2 - x1;
+        var deltaY = y2 - y1;
+
+        return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
     }
 
     private static async Task<GameEventEnvelope> ReadSingle(IGameEventStore store)

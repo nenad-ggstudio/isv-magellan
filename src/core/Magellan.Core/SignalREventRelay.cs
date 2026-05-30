@@ -32,7 +32,7 @@ public sealed class SignalREventRelay(
             {
                 await gameHub.Clients
                     .Client(stateChanged.ConnectionId)
-                    .GameStateChanged(stateChanged.State);
+                    .GameStateChanged(ClientGameStateProjection.ForClient(stateChanged.State));
             }
             else if (envelope.Event is TickGameEvent gameTick)
             {

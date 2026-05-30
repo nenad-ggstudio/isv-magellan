@@ -18,10 +18,20 @@ public sealed record GameWorld(
     private const double JumpAreaRadiusLightYears = JumpAreaSpanLightYears / 2;
     private const double LocalMapRadiusKilometers = 10_000;
     private const double LocalAsteroidInnerRadiusKilometers = 750;
-    private const double LocalAsteroidMinimumSpeedKilometersPerSecond = 0.2;
-    private const double LocalAsteroidMaximumSpeedKilometersPerSecond = 1.4;
+    private const double LocalAsteroidMinimumSpeedKilometersPerSecond = 0.4;
+    private const double LocalAsteroidMaximumSpeedKilometersPerSecond = 2.4;
     private const int MinimumLocalAsteroidCount = 12;
     private const int MaximumLocalAsteroidCount = 18;
+
+    private const double AsteroidClusterMinimumSpeedKilometersPerSecond = 0.6;
+    private const double AsteroidClusterMaximumSpeedKilometersPerSecond = 1.2;
+    private const double RoguePlanetMinimumSpeedKilometersPerSecond = 0.1;
+    private const double RoguePlanetMaximumSpeedKilometersPerSecond = 0.3;
+    private const double CometMinimumSpeedKilometersPerSecond = 1.6;
+    private const double CometMaximumSpeedKilometersPerSecond = 6.4;
+    private const double EnergyParticleWellsMinimumSpeedKilometersPerSecond = 0.1;
+    private const double EnergyParticleWellsMaximumSpeedKilometersPerSecond = 0.2;
+
     private static readonly (string Kind, string Label)[] SensorAnomalyTypes =
     [
         (SensorAnomalyKinds.RoguePlanet, "Rogue Planet"),
@@ -90,7 +100,8 @@ public sealed record GameWorld(
             data.Width,
             data.Height,
             data.DistanceUnit,
-            data.Systems.Select(system => new StellarSystem(
+            [
+                .. data.Systems.Select(system => new StellarSystem(
                     system.Id,
                     system.Name,
                     system.Role,
@@ -102,8 +113,8 @@ public sealed record GameWorld(
                     system.PlanetCountPrediction,
                     system.PlanetCountAccuracy,
                     system.ResourceDetections
-                ))
-                .ToArray()
+                )),
+            ]
         );
     }
 
@@ -157,6 +168,7 @@ public sealed record GameWorld(
         var distance = Math.Sqrt(random.NextDouble()) * JumpAreaRadiusLightYears;
         var angleRadians = random.NextDouble() * Math.Tau;
         var (Kind, Label) = SensorAnomalyTypes[random.Next(SensorAnomalyTypes.Length)];
+        var (Speed, Angle, Distortion) = GetAnomalyMovement(Kind, random);
 
         return new SensorAnomaly(
             $"jump-anomaly-{index:000}",
@@ -164,8 +176,64 @@ public sealed record GameWorld(
             Label,
             center + (Math.Cos(angleRadians) * distance),
             center + (Math.Sin(angleRadians) * distance),
-            distance
+            distance,
+            Speed,
+            Angle,
+            Distortion
         );
+    }
+
+    private static (double Speed, double Angle, double Distortion) GetAnomalyMovement(
+        string kind,
+        Random random
+    )
+    {
+        var angleRadians = random.NextDouble() * Math.Tau;
+        switch (kind)
+        {
+            case SensorAnomalyKinds.AsteroidCluster:
+            {
+                var speed = RandomDouble(
+                    random,
+                    AsteroidClusterMinimumSpeedKilometersPerSecond,
+                    AsteroidClusterMaximumSpeedKilometersPerSecond
+                );
+                var distortion = RandomDouble(random, 70, 85) / 100;
+                return (speed, angleRadians, distortion);
+            }
+            case SensorAnomalyKinds.Comet:
+            {
+                var speed = RandomDouble(
+                    random,
+                    CometMinimumSpeedKilometersPerSecond,
+                    CometMaximumSpeedKilometersPerSecond
+                );
+                var distortion = RandomDouble(random, 30, 45) / 100;
+                return (speed, angleRadians, distortion);
+            }
+            case SensorAnomalyKinds.RoguePlanet:
+            {
+                var speed = RandomDouble(
+                    random,
+                    RoguePlanetMinimumSpeedKilometersPerSecond,
+                    RoguePlanetMaximumSpeedKilometersPerSecond
+                );
+                var distortion = RandomDouble(random, 5, 15) / 100;
+                return (speed, angleRadians, distortion);
+            }
+            case SensorAnomalyKinds.EnergyParticleWells:
+            {
+                var speed = RandomDouble(
+                    random,
+                    EnergyParticleWellsMinimumSpeedKilometersPerSecond,
+                    EnergyParticleWellsMaximumSpeedKilometersPerSecond
+                );
+                var distortion = RandomDouble(random, 90, 95) / 100;
+                return (speed, angleRadians, distortion);
+            }
+            default:
+                throw new NotSupportedException();
+        }
     }
 
     private static int GetJumpAreaSeed(WorldPosition shipPosition, DateTimeOffset currentTime)
@@ -182,16 +250,10 @@ public sealed record GameWorld(
         return x >= 0 && x <= JumpAreaSpanLightYears && y >= 0 && y <= JumpAreaSpanLightYears;
     }
 
-    private static LocalMap BuildLocalMap(
-        WorldPosition shipPosition,
-        DateTimeOffset currentTime
-    )
+    private static LocalMap BuildLocalMap(WorldPosition shipPosition, DateTimeOffset currentTime)
     {
         var random = new Random(GetLocalMapSeed(shipPosition, currentTime));
-        var asteroidCount = random.Next(
-            MinimumLocalAsteroidCount,
-            MaximumLocalAsteroidCount + 1
-        );
+        var asteroidCount = random.Next(MinimumLocalAsteroidCount, MaximumLocalAsteroidCount + 1);
         var typeCounts = LocalAsteroidTypes.ToDictionary(type => type.Id, _ => 0);
 
         return new LocalMap(
@@ -199,10 +261,12 @@ public sealed record GameWorld(
             "Local Map",
             LocalMapRadiusKilometers,
             DistanceUnits.Kilometer,
-            Enumerable.Range(1, asteroidCount)
-                .Select(index => LocalContact(BuildLocalAsteroid(index, random, typeCounts)))
-                .OrderBy(contact => contact.Distance)
-                .ToArray()
+            [
+                .. Enumerable
+                    .Range(1, asteroidCount)
+                    .Select(index => LocalContact(BuildLocalAsteroid(index, random, typeCounts)))
+                    .OrderBy(contact => contact.Distance),
+            ]
         );
     }
 

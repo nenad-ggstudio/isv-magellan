@@ -7,7 +7,8 @@ public sealed record JumpAreaMap(
     double Height,
     string DistanceUnit,
     IReadOnlyList<StellarSystem> Systems,
-    IReadOnlyList<SensorAnomaly> Anomalies);
+    IReadOnlyList<SensorAnomaly> Anomalies
+);
 
 public sealed record SensorAnomaly(
     string Id,
@@ -15,7 +16,11 @@ public sealed record SensorAnomaly(
     string Label,
     double X,
     double Y,
-    double Distance);
+    double Distance,
+    double Speed,
+    double Angle,
+    double Distortion
+);
 
 public static class SensorAnomalyKinds
 {

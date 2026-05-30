@@ -8,14 +8,20 @@ import type { ActiveGameState, GameTick } from '../gameTypes'
 type GamePageProps = {
   connectionState: string
   game: ActiveGameState
+  onCaptureEmScanReport: (focus: number, filter: number) => Promise<void>
+  onStartEmScan: (x: number, y: number) => Promise<void>
   onStartGravityScan: () => Promise<void>
+  onStopEmScan: () => Promise<void>
   tick: GameTick
 }
 
 export function GamePage({
   connectionState,
   game,
+  onCaptureEmScanReport,
+  onStartEmScan,
   onStartGravityScan,
+  onStopEmScan,
   tick,
 }: GamePageProps) {
   return (
@@ -29,8 +35,12 @@ export function GamePage({
       <CrewHub />
       <Navigation
         elapsedMilliseconds={tick.elapsedMilliseconds}
+        emScanner={game.ship.scanners.emScanner}
         gravityScanner={game.ship.scanners.gravityScanner}
+        onCaptureEmScanReport={onCaptureEmScanReport}
+        onStartEmScan={onStartEmScan}
         onStartGravityScan={onStartGravityScan}
+        onStopEmScan={onStopEmScan}
         tick={tick.tick}
         world={game.world}
       />

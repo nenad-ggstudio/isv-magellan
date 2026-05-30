@@ -42,6 +42,7 @@ try
     builder.Services.AddSingleton<GameManager>();
     builder.Services.AddHostedService(serviceProvider =>
         serviceProvider.GetRequiredService<GameEngine>());
+    builder.Services.AddHostedService<GameStateTickProcessor>();
     builder.Services.AddHostedService<SignalREventRelay>();
 
     var app = builder.Build();

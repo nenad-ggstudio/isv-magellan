@@ -40,6 +40,16 @@ public sealed class Ship
             scanners);
     }
 
+    public Ship WithBatteryBank(ShipBatteryBank batteryBank)
+    {
+        return new Ship(
+            Name,
+            StorageUnits,
+            FusionCore,
+            batteryBank,
+            Scanners);
+    }
+
     public static Ship StartingShip()
     {
         return new Ship(
