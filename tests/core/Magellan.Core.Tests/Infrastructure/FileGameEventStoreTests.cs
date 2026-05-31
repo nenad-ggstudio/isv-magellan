@@ -10,6 +10,9 @@ namespace Magellan.Core.Tests.Infrastructure;
 
 public sealed class FileGameEventStoreTests
 {
+    private static readonly Guid TestGameId =
+        Guid.Parse("9a7472e9-ec4b-4183-b1c7-2df71162e03a");
+
     [Fact]
     public async Task AppendAsync_does_not_write_tick_events_by_default()
     {
@@ -18,7 +21,7 @@ public sealed class FileGameEventStoreTests
         using (var store = CreateStore(workspace))
         {
             await store.AppendAsync(
-                new TickGameEvent("connection-1", new GameTick(250, 7)));
+                new TickGameEvent(TestGameId, new GameTick(250, 7)));
         }
 
         Assert.False(File.Exists(workspace.GameEventsPath));
@@ -33,7 +36,7 @@ public sealed class FileGameEventStoreTests
         using (var store = CreateStore(workspace, logTickEvents: true))
         {
             await store.AppendAsync(
-                new TickGameEvent("connection-1", new GameTick(250, 7)));
+                new TickGameEvent(TestGameId, new GameTick(250, 7)));
         }
 
         Assert.False(File.Exists(workspace.GameEventsPath));
@@ -42,7 +45,7 @@ public sealed class FileGameEventStoreTests
         var columns = tickLine.Split('\t');
 
         Assert.Equal("1", columns[0]);
-        Assert.Equal("connection-1", columns[2]);
+        Assert.Equal(TestGameId.ToString(), columns[2]);
         Assert.Equal("250", columns[3]);
         Assert.Equal("7", columns[4]);
     }
@@ -54,7 +57,7 @@ public sealed class FileGameEventStoreTests
 
         using (var store = CreateStore(workspace))
         {
-            await store.AppendAsync(new TestGameEvent("connection-1", "started"));
+            await store.AppendAsync(new TestGameEvent(TestGameId, "started"));
         }
 
         Assert.False(File.Exists(workspace.TickEventsPath));
@@ -63,13 +66,13 @@ public sealed class FileGameEventStoreTests
         var persistedEvent = Assert.Single(document.RootElement.EnumerateArray());
 
         Assert.Equal(typeof(TestGameEvent).FullName, persistedEvent.GetProperty("type").GetString());
-        Assert.Equal("connection-1", persistedEvent.GetProperty("connectionId").GetString());
+        Assert.Equal(TestGameId, persistedEvent.GetProperty("gameId").GetGuid());
 
         using var reloadedStore = CreateStore(workspace);
         var replayed = await ReadSingle(reloadedStore);
         var replayedEvent = Assert.IsType<TestGameEvent>(replayed.Event);
 
-        Assert.Equal("connection-1", replayedEvent.ConnectionId);
+        Assert.Equal(TestGameId, replayedEvent.GameId);
         Assert.Equal("started", replayedEvent.Name);
     }
 
@@ -77,18 +80,18 @@ public sealed class FileGameEventStoreTests
     public async Task AppendAsync_rehydrates_game_state_changed_events()
     {
         using var workspace = TestWorkspace.Create();
-        var state = GameState.NewGame(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        var state = GameState.NewGame(TestGameId, DateTimeOffset.UtcNow);
 
         using (var store = CreateStore(workspace))
         {
-            await store.AppendAsync(new GameStateChangedGameEvent("connection-1", state));
+            await store.AppendAsync(new GameStateChangedGameEvent(TestGameId, state));
         }
 
         using var reloadedStore = CreateStore(workspace);
         var replayed = await ReadSingle(reloadedStore);
         var replayedEvent = Assert.IsType<GameStateChangedGameEvent>(replayed.Event);
 
-        Assert.Equal("connection-1", replayedEvent.ConnectionId);
+        Assert.Equal(TestGameId, replayedEvent.GameId);
         Assert.Equal(GameScreens.Game, replayedEvent.State.Screen);
 
         var expectedGame = Assert.IsType<ActiveGameState>(state.Game);
@@ -149,12 +152,12 @@ public sealed class FileGameEventStoreTests
         using (var store = CreateStore(workspace, logTickEvents: true))
         {
             await store.AppendAsync(
-                new TickGameEvent("connection-1", new GameTick(250, 1)));
+                new TickGameEvent(TestGameId, new GameTick(250, 1)));
         }
 
         using var reloadedStore = CreateStore(workspace);
         var gameEvent = await reloadedStore.AppendAsync(
-            new TestGameEvent("connection-1", "started"));
+            new TestGameEvent(TestGameId, "started"));
 
         Assert.Equal(2, gameEvent.Sequence);
     }
@@ -182,7 +185,7 @@ public sealed class FileGameEventStoreTests
         throw new InvalidOperationException("The event store did not return an event.");
     }
 
-    public sealed record TestGameEvent(string ConnectionId, string Name) : GameEvent(ConnectionId);
+    public sealed record TestGameEvent(Guid GameId, string Name) : GameEvent(GameId);
 
     private sealed class TestWorkspace : IDisposable
     {

@@ -18,7 +18,7 @@ public sealed class GameManagerTests
         await manager.ConnectAsync("connection-1");
 
         var envelope = await ReadSingle(store);
-        var gameEvent = Assert.IsType<GameStateChangedGameEvent>(envelope.Event);
+        var gameEvent = Assert.IsType<ClientGameStateChangedGameEvent>(envelope.Event);
 
         Assert.Equal("connection-1", gameEvent.ConnectionId);
         Assert.Equal(GameScreens.Bootstrap, gameEvent.State.Screen);
@@ -44,6 +44,7 @@ public sealed class GameManagerTests
         Assert.Equal(GameScreens.Game, gameEvent.State.Screen);
         Assert.Empty(gameEvent.State.Actions);
         Assert.NotNull(activeGame);
+        Assert.Equal(activeGame!.Id, gameEvent.GameId);
         Assert.Equal("Magellan Sector", activeGame!.Name);
         Assert.Equal(
             new GameResources(
@@ -217,6 +218,30 @@ public sealed class GameManagerTests
                     estimate =>
                         estimate.Resource == ResourceNames.Lithium &&
                         estimate.Label == "lots"));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_publishes_current_game_state_for_new_connection()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+
+        await manager.StartNewGameAsync("connection-1");
+
+        var newGameEvents = await ReadAll(store);
+        var newGameEvent = Assert.IsType<GameStateChangedGameEvent>(
+            newGameEvents.Last().Event);
+
+        manager.Disconnect("connection-1");
+        await manager.ConnectAsync("connection-2");
+
+        var events = await ReadAll(store);
+        var snapshotEvent = Assert.IsType<ClientGameStateChangedGameEvent>(
+            events.Last().Event);
+
+        Assert.Equal("connection-2", snapshotEvent.ConnectionId);
+        Assert.Equal(GameScreens.Game, snapshotEvent.State.Screen);
+        Assert.Equal(newGameEvent.GameId, snapshotEvent.State.Game?.Id);
     }
 
     [Fact]
@@ -417,9 +442,9 @@ public sealed class GameManagerTests
         var store = new InMemoryGameEventStore();
         var manager = CreateManager(store);
 
-        await manager.StartNewGameAsync("connection-1");
+        var gameId = await StartNewGameAndReadGameId(manager, store);
         await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
-        await manager.ApplyTickAsync("connection-1", new GameTick(2_500, 10));
+        await manager.ApplyTickAsync(gameId, new GameTick(2_500, 10));
 
         var events = await ReadAll(store);
         var tickEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
@@ -438,8 +463,8 @@ public sealed class GameManagerTests
         var store = new InMemoryGameEventStore();
         var manager = CreateManager(store);
 
-        await manager.StartNewGameAsync("connection-1");
-        await manager.ApplyTickAsync("connection-1", new GameTick(2_500, 10));
+        var gameId = await StartNewGameAndReadGameId(manager, store);
+        await manager.ApplyTickAsync(gameId, new GameTick(2_500, 10));
 
         var events = await ReadAll(store);
 
@@ -452,9 +477,9 @@ public sealed class GameManagerTests
         var store = new InMemoryGameEventStore();
         var manager = CreateManager(store);
 
-        await manager.StartNewGameAsync("connection-1");
+        var gameId = await StartNewGameAndReadGameId(manager, store);
         await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
-        await manager.ApplyTickAsync("connection-1", new GameTick(7_500, 30));
+        await manager.ApplyTickAsync(gameId, new GameTick(7_500, 30));
 
         var events = await ReadAll(store);
         var tickEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
@@ -473,9 +498,9 @@ public sealed class GameManagerTests
         var store = new InMemoryGameEventStore();
         var manager = CreateManager(store);
 
-        await manager.StartNewGameAsync("connection-1");
+        var gameId = await StartNewGameAndReadGameId(manager, store);
         await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
-        await manager.ApplyTickAsync("connection-1", new GameTick(2_000_000, 8_000));
+        await manager.ApplyTickAsync(gameId, new GameTick(2_000_000, 8_000));
 
         var events = await ReadAll(store);
         var tickEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
@@ -492,9 +517,9 @@ public sealed class GameManagerTests
         var store = new InMemoryGameEventStore();
         var manager = CreateManager(store);
 
-        await manager.StartNewGameAsync("connection-1");
+        var gameId = await StartNewGameAndReadGameId(manager, store);
         await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
-        await manager.ApplyTickAsync("connection-1", new GameTick(2_000_000, 8_000));
+        await manager.ApplyTickAsync(gameId, new GameTick(2_000_000, 8_000));
         await manager.StartEmScanAsync("connection-1", 1.2, 1.4);
 
         var events = await ReadAll(store);
@@ -540,6 +565,18 @@ public sealed class GameManagerTests
         var gameEngine = new GameEngine(bus, NullLogger<GameEngine>.Instance);
 
         return new GameManager(bus, gameEngine, NullLogger<GameManager>.Instance);
+    }
+
+    private static async Task<Guid> StartNewGameAndReadGameId(
+        GameManager manager,
+        IGameEventStore store)
+    {
+        await manager.StartNewGameAsync("connection-1");
+
+        var events = await ReadAll(store);
+        var newGameEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+
+        return newGameEvent.GameId;
     }
 
     private static (double X, double Y) FindQuietPoint(

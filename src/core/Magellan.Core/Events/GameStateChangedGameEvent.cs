@@ -2,5 +2,5 @@ using Infrastructure;
 
 namespace Events;
 
-public sealed record GameStateChangedGameEvent(string ConnectionId, GameState State)
-    : GameEvent(ConnectionId);
+public sealed record GameStateChangedGameEvent(Guid GameId, GameState State)
+    : GameEvent(GameId);

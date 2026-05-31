@@ -8,38 +8,56 @@ public sealed class GameManager(
     GameEngine gameEngine,
     ILogger<GameManager> logger)
 {
-    private readonly ConcurrentDictionary<string, GameState> states = new();
+    private readonly ConcurrentDictionary<Guid, GameState> states = new();
+    private readonly ConcurrentDictionary<string, Guid> connectionGames = new();
+    private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> gameConnections = new();
+    private readonly Lock currentGameGate = new();
+    private Guid? currentGameId;
 
     public async Task ConnectAsync(
         string connectionId,
         CancellationToken cancellationToken = default)
     {
-        var state = states.GetOrAdd(connectionId, _ => GameState.Bootstrap());
-        await PublishStateChanged(connectionId, state, cancellationToken);
+        var activeGameId = GetCurrentGameId();
+
+        if (activeGameId is Guid gameId && states.TryGetValue(gameId, out var state))
+        {
+            AttachConnection(connectionId, gameId);
+            await PublishClientStateChanged(connectionId, state, cancellationToken);
+            return;
+        }
+
+        await PublishClientStateChanged(
+            connectionId,
+            GameState.Bootstrap(),
+            cancellationToken);
     }
 
     public async Task StartNewGameAsync(
         string connectionId,
         CancellationToken cancellationToken = default)
     {
-        var state = GameState.NewGame(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        var gameId = Guid.NewGuid();
+        var startedAt = DateTimeOffset.UtcNow;
+        var state = GameState.NewGame(gameId, startedAt);
 
-        states[connectionId] = state;
-        await PublishStateChanged(connectionId, state, cancellationToken);
+        ReplaceCurrentGame(gameId, state, connectionId);
+        gameEngine.StartNewGame(gameId, startedAt);
 
-        gameEngine.StartNewGame(connectionId);
+        await PublishStateChanged(gameId, state, cancellationToken);
     }
 
     public async Task StartGravityScanAsync(
         string connectionId,
         CancellationToken cancellationToken = default)
     {
-        if (!states.TryGetValue(connectionId, out var state) || state.Game is null)
+        if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+            || state?.Game is null)
         {
             return;
         }
 
-        var tick = gameEngine.GetCurrentTick(connectionId);
+        var tick = gameEngine.GetCurrentTick(gameId);
         var activeGame = state.Game;
         var scanner = activeGame.Ship.Scanners.GravityScanner;
 
@@ -62,8 +80,8 @@ public sealed class GameManager(
             }
         };
 
-        states[connectionId] = nextState;
-        await PublishStateChanged(connectionId, nextState, cancellationToken);
+        states[gameId] = nextState;
+        await PublishStateChanged(gameId, nextState, cancellationToken);
     }
 
     public async Task StartEmScanAsync(
@@ -72,7 +90,8 @@ public sealed class GameManager(
         double targetY,
         CancellationToken cancellationToken = default)
     {
-        if (!states.TryGetValue(connectionId, out var state) || state.Game is null)
+        if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+            || state?.Game is null)
         {
             return;
         }
@@ -85,7 +104,7 @@ public sealed class GameManager(
             return;
         }
 
-        var tick = gameEngine.GetCurrentTick(connectionId);
+        var tick = gameEngine.GetCurrentTick(gameId);
         var nextScanner = scanner.StartScan(
             tick,
             targetX,
@@ -104,8 +123,8 @@ public sealed class GameManager(
             }
         };
 
-        states[connectionId] = nextState;
-        await PublishStateChanged(connectionId, nextState, cancellationToken);
+        states[gameId] = nextState;
+        await PublishStateChanged(gameId, nextState, cancellationToken);
     }
 
     public async Task CaptureEmScanReportAsync(
@@ -115,7 +134,8 @@ public sealed class GameManager(
         double phaseErrorRadians,
         CancellationToken cancellationToken = default)
     {
-        if (!states.TryGetValue(connectionId, out var state) || state.Game is null)
+        if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+            || state?.Game is null)
         {
             return;
         }
@@ -128,7 +148,7 @@ public sealed class GameManager(
             return;
         }
 
-        var tick = gameEngine.GetCurrentTick(connectionId);
+        var tick = gameEngine.GetCurrentTick(gameId);
         var nextScanner = scanner.CaptureReport(
             tick,
             activeGame.World.JumpAreaMap,
@@ -148,15 +168,16 @@ public sealed class GameManager(
             }
         };
 
-        states[connectionId] = nextState;
-        await PublishStateChanged(connectionId, nextState, cancellationToken);
+        states[gameId] = nextState;
+        await PublishStateChanged(gameId, nextState, cancellationToken);
     }
 
     public async Task StopEmScanAsync(
         string connectionId,
         CancellationToken cancellationToken = default)
     {
-        if (!states.TryGetValue(connectionId, out var state) || state.Game is null)
+        if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+            || state?.Game is null)
         {
             return;
         }
@@ -182,16 +203,16 @@ public sealed class GameManager(
             }
         };
 
-        states[connectionId] = nextState;
-        await PublishStateChanged(connectionId, nextState, cancellationToken);
+        states[gameId] = nextState;
+        await PublishStateChanged(gameId, nextState, cancellationToken);
     }
 
     public async Task ApplyTickAsync(
-        string connectionId,
+        Guid gameId,
         GameTick tick,
         CancellationToken cancellationToken = default)
     {
-        if (!states.TryGetValue(connectionId, out var state) || state.Game is null)
+        if (!states.TryGetValue(gameId, out var state) || state.Game is null)
         {
             return;
         }
@@ -237,27 +258,165 @@ public sealed class GameManager(
             }
         };
 
-        states[connectionId] = nextState;
-        await PublishStateChanged(connectionId, nextState, cancellationToken);
+        states[gameId] = nextState;
+        await PublishStateChanged(gameId, nextState, cancellationToken);
     }
 
     public void Disconnect(string connectionId)
     {
-        states.TryRemove(connectionId, out _);
-        gameEngine.StopGame(connectionId);
+        DetachConnection(connectionId);
+    }
+
+    public IReadOnlyList<string> GetConnectionIds(Guid gameId)
+    {
+        return gameConnections.TryGetValue(gameId, out var connections)
+            ? connections.Keys.ToArray()
+            : [];
+    }
+
+    private bool TryGetGameForConnection(
+        string connectionId,
+        out Guid gameId,
+        out GameState? state)
+    {
+        if (connectionGames.TryGetValue(connectionId, out gameId)
+            && states.TryGetValue(gameId, out state))
+        {
+            return true;
+        }
+
+        var activeGameId = GetCurrentGameId();
+
+        if (activeGameId is Guid currentGame
+            && states.TryGetValue(currentGame, out state))
+        {
+            gameId = currentGame;
+            AttachConnection(connectionId, currentGame);
+            return true;
+        }
+
+        gameId = default;
+        state = null;
+        return false;
+    }
+
+    private void ReplaceCurrentGame(
+        Guid gameId,
+        GameState state,
+        string connectionId)
+    {
+        Guid? previousGameId;
+
+        lock (currentGameGate)
+        {
+            previousGameId = currentGameId;
+            currentGameId = gameId;
+        }
+
+        var connectionIds = new HashSet<string>(StringComparer.Ordinal)
+        {
+            connectionId
+        };
+
+        if (previousGameId is Guid previousGame && previousGame != gameId)
+        {
+            foreach (var previousConnectionId in DetachGame(previousGame))
+            {
+                connectionIds.Add(previousConnectionId);
+            }
+
+            states.TryRemove(previousGame, out _);
+            gameEngine.StopGame(previousGame);
+        }
+
+        states[gameId] = state;
+
+        foreach (var connectedConnectionId in connectionIds)
+        {
+            AttachConnection(connectedConnectionId, gameId);
+        }
+    }
+
+    private Guid? GetCurrentGameId()
+    {
+        lock (currentGameGate)
+        {
+            return currentGameId;
+        }
+    }
+
+    private void AttachConnection(string connectionId, Guid gameId)
+    {
+        DetachConnection(connectionId);
+
+        connectionGames[connectionId] = gameId;
+        var connections = gameConnections.GetOrAdd(
+            gameId,
+            _ => new ConcurrentDictionary<string, byte>());
+        connections[connectionId] = 0;
+    }
+
+    private void DetachConnection(string connectionId)
+    {
+        if (!connectionGames.TryRemove(connectionId, out var gameId))
+        {
+            return;
+        }
+
+        if (gameConnections.TryGetValue(gameId, out var connections))
+        {
+            connections.TryRemove(connectionId, out _);
+        }
+    }
+
+    private IReadOnlyList<string> DetachGame(Guid gameId)
+    {
+        if (!gameConnections.TryRemove(gameId, out var connections))
+        {
+            return [];
+        }
+
+        var connectionIds = connections.Keys.ToArray();
+
+        foreach (var connectionId in connectionIds)
+        {
+            if (connectionGames.TryGetValue(connectionId, out var mappedGameId)
+                && mappedGameId == gameId)
+            {
+                connectionGames.TryRemove(connectionId, out _);
+            }
+        }
+
+        return connectionIds;
     }
 
     private async Task PublishStateChanged(
+        Guid gameId,
+        GameState state,
+        CancellationToken cancellationToken)
+    {
+        var envelope = await gameEventBus.PublishAsync(
+            new GameStateChangedGameEvent(gameId, state),
+            cancellationToken);
+
+        logger.LogInformation(
+            "Game state changed for game {GameId}: {Screen} (Sequence: {Sequence}).",
+            gameId,
+            state.Screen,
+            envelope.Sequence);
+    }
+
+    private async Task PublishClientStateChanged(
         string connectionId,
         GameState state,
         CancellationToken cancellationToken)
     {
         var envelope = await gameEventBus.PublishAsync(
-            new GameStateChangedGameEvent(connectionId, state),
+            new ClientGameStateChangedGameEvent(connectionId, state),
             cancellationToken);
 
         logger.LogInformation(
-            "Game state changed for connection {ConnectionId}: {Screen} (GameId: {GameId}, Sequence: {Sequence}).",
+            "Client game state snapshot for connection {ConnectionId}: {Screen} (GameId: {GameId}, Sequence: {Sequence}).",
             connectionId,
             state.Screen,
             state.Game?.Id,

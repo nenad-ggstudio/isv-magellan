@@ -155,7 +155,7 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
 
         var line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{envelope.Sequence}\t{envelope.OccurredAt.ToUnixTimeMilliseconds()}\t{tickGameEvent.ConnectionId}\t{tickGameEvent.Tick.ElapsedMilliseconds}\t{tickGameEvent.Tick.Tick}");
+            $"{envelope.Sequence}\t{envelope.OccurredAt.ToUnixTimeMilliseconds()}\t{tickGameEvent.GameId}\t{tickGameEvent.Tick.ElapsedMilliseconds}\t{tickGameEvent.Tick.Tick}");
 
         await tickWriter.WriteLineAsync(line.AsMemory(), cancellationToken);
     }
@@ -222,7 +222,7 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
         long Sequence,
         DateTimeOffset OccurredAt,
         string Type,
-        string ConnectionId,
+        Guid GameId,
         JsonElement Payload)
     {
         public static PersistedGameEvent FromEnvelope(GameEventEnvelope envelope)
@@ -231,7 +231,7 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
                 envelope.Sequence,
                 envelope.OccurredAt,
                 envelope.Event.GetType().FullName ?? envelope.Event.GetType().Name,
-                envelope.Event.ConnectionId,
+                envelope.Event.GameId,
                 JsonSerializer.SerializeToElement(
                     envelope.Event,
                     envelope.Event.GetType(),

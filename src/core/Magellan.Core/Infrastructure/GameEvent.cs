@@ -1,3 +1,3 @@
 namespace Infrastructure;
 
-public abstract record GameEvent(string ConnectionId);
+public abstract record GameEvent(Guid GameId);

@@ -22,7 +22,7 @@ public sealed class GameStateTickProcessor(
                 try
                 {
                     await gameManager.ApplyTickAsync(
-                        tickEvent.ConnectionId,
+                        tickEvent.GameId,
                         tickEvent.Tick,
                         stoppingToken);
                 }
@@ -30,9 +30,9 @@ public sealed class GameStateTickProcessor(
                 {
                     logger.LogWarning(
                         exception,
-                        "Unable to process game state tick {Tick} for connection {ConnectionId}.",
+                        "Unable to process game state tick {Tick} for game {GameId}.",
                         tickEvent.Tick.Tick,
-                        tickEvent.ConnectionId);
+                        tickEvent.GameId);
                 }
             }
         }

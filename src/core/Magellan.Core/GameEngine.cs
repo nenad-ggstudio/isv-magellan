@@ -7,21 +7,21 @@ public sealed class GameEngine(
     ILogger<GameEngine> logger) : BackgroundService
 {
     private static readonly TimeSpan TickRate = TimeSpan.FromMilliseconds(250);
-    private readonly ConcurrentDictionary<string, GameSession> sessions = new();
+    private readonly ConcurrentDictionary<Guid, GameSession> sessions = new();
 
-    public void StartNewGame(string connectionId)
+    public void StartNewGame(Guid gameId, DateTimeOffset startedAt)
     {
-        sessions[connectionId] = new GameSession(DateTimeOffset.UtcNow);
+        sessions[gameId] = new GameSession(startedAt);
     }
 
-    public void StopGame(string connectionId)
+    public void StopGame(Guid gameId)
     {
-        sessions.TryRemove(connectionId, out _);
+        sessions.TryRemove(gameId, out _);
     }
 
-    public long GetCurrentTick(string connectionId)
+    public long GetCurrentTick(Guid gameId)
     {
-        return sessions.TryGetValue(connectionId, out var session)
+        return sessions.TryGetValue(gameId, out var session)
             ? session.CurrentTick
             : 0;
     }
@@ -47,22 +47,22 @@ public sealed class GameEngine(
     {
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var (connectionId, session) in sessions)
+        foreach (var (gameId, session) in sessions)
         {
             var nextTick = session.NextTick(now);
 
             try
             {
                 await gameEventBus.PublishAsync(
-                    new TickGameEvent(connectionId, nextTick),
+                    new TickGameEvent(gameId, nextTick),
                     stoppingToken);
             }
             catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogWarning(
                     exception,
-                    "Unable to publish game tick event for connection {ConnectionId}.",
-                    connectionId);
+                    "Unable to publish game tick event for game {GameId}.",
+                    gameId);
             }
         }
     }
