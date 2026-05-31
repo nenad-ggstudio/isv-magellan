@@ -161,10 +161,10 @@ public sealed class GameManagerTests
                 Assert.NotEmpty(anomaly.Label);
                 Assert.InRange(anomaly.X, 0, world.JumpAreaMap.Width);
                 Assert.InRange(anomaly.Y, 0, world.JumpAreaMap.Height);
-                Assert.InRange(anomaly.Distance, 0, world.JumpAreaMap.Width / 2);
-                Assert.InRange(anomaly.Speed, 0, 6.4);
+                Assert.InRange(anomaly.Speed, 1, 100);
                 Assert.InRange(anomaly.Angle, 0, Math.Tau);
-                Assert.InRange(anomaly.Distortion, 0, 1);
+                Assert.InRange(anomaly.Mass, 1, 100);
+                Assert.InRange(anomaly.Energy, 1, 100);
             });
 
         Assert.Equal("local-map", world.LocalMap.Id);
@@ -300,7 +300,11 @@ public sealed class GameManagerTests
         Assert.Equal(0.1, currentScan.RadiusLightYears, precision: 3);
         Assert.Empty(scanner.Reports);
         Assert.InRange(currentScan.SignalProfile.BaseStrength, 0, 1);
-        Assert.InRange(currentScan.SignalProfile.NoiseLevel, 0, 1);
+        Assert.InRange(currentScan.SignalProfile.BaseAmplitude, 10, 180);
+        Assert.InRange(currentScan.SignalProfile.PrimaryWavelength, 80, 620);
+        Assert.InRange(currentScan.SignalProfile.PhaseShiftRadians, 0, Math.PI);
+        Assert.InRange(currentScan.SignalProfile.IdealFilter, 1, 100);
+        Assert.InRange(currentScan.SignalProfile.IdealFocus, 1, 100);
     }
 
     [Fact]
@@ -338,7 +342,7 @@ public sealed class GameManagerTests
     }
 
     [Fact]
-    public async Task CaptureEmScanReportAsync_creates_report_with_anomaly_estimates()
+    public async Task CaptureEmScanReportAsync_creates_report_with_partial_analysis()
     {
         var store = new InMemoryGameEventStore();
         var manager = CreateManager(store);
@@ -352,8 +356,9 @@ public sealed class GameManagerTests
         await manager.StartEmScanAsync("connection-1", anomaly.X, anomaly.Y);
         await manager.CaptureEmScanReportAsync(
             "connection-1",
-            1 - anomaly.Distortion,
-            0.25 + (anomaly.Distortion * 0.55));
+            (anomaly.Speed + anomaly.Energy) / 2.0,
+            (anomaly.Mass + anomaly.Energy) / 2.0,
+            0);
 
         var events = await ReadAll(store);
         var reportEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
@@ -364,17 +369,14 @@ public sealed class GameManagerTests
         Assert.Equal(anomaly.X, report.Target.X, precision: 3);
         Assert.Equal(anomaly.Y, report.Target.Y, precision: 3);
         Assert.Equal(0.1, report.RadiusLightYears, precision: 3);
-        Assert.InRange(report.SignalStrength, 0, 1);
-        Assert.InRange(report.Coherence, 0, 1);
-        Assert.InRange(report.DriftStability, 0, 1);
-        Assert.NotNull(report.EstimatedSpeedKilometersPerSecond);
-        Assert.NotNull(report.EstimatedAngleDegrees);
-        Assert.NotNull(report.EstimatedDistortion);
-        Assert.True(report.EstimatedSpeedKilometersPerSecond > 0);
-        Assert.InRange(report.EstimatedAngleDegrees!.Value, 0, 360);
-        Assert.InRange(report.EstimatedDistortion!.Value, 0, 1);
-        Assert.NotEqual("none", report.Confidence);
+        Assert.Equal(1, report.SignalConfidence);
+        Assert.Equal(1, report.FilterScore);
+        Assert.Equal(1, report.PhaseScore);
+        Assert.NotEqual(EmScanConfidenceLabels.Unstable, report.Confidence);
         Assert.NotEqual(EmScanLockStates.NoSignal, report.LockState);
+        Assert.Contains("mass or energy output", report.ReadingSummary);
+        Assert.Contains("motion or energy output", report.ReadingSummary);
+        Assert.NotEmpty(report.RecommendedFollowUp);
     }
 
     [Fact]
@@ -393,18 +395,20 @@ public sealed class GameManagerTests
             newGameEvent.State.Game.Ship.Scanners.EmScanner.ScanRadiusLightYears);
 
         await manager.StartEmScanAsync("connection-1", quietPoint.X, quietPoint.Y);
-        await manager.CaptureEmScanReportAsync("connection-1", 0.5, 0.5);
+        await manager.CaptureEmScanReportAsync("connection-1", 50, 50, 0);
 
         var events = await ReadAll(store);
         var reportEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
         var scanner = reportEvent.State.Game?.Ship.Scanners.EmScanner;
         var report = Assert.Single(scanner!.Reports);
 
-        Assert.Equal("none", report.Confidence);
+        Assert.Equal(EmScanConfidenceLabels.Unstable, report.Confidence);
         Assert.Equal(EmScanLockStates.NoSignal, report.LockState);
-        Assert.Null(report.EstimatedSpeedKilometersPerSecond);
-        Assert.Null(report.EstimatedAngleDegrees);
-        Assert.Null(report.EstimatedDistortion);
+        Assert.Equal(0, report.SignalConfidence);
+        Assert.Equal(0, report.FilterScore);
+        Assert.Equal(1, report.PhaseScore);
+        Assert.Contains("No stable anomaly reading", report.ReadingSummary);
+        Assert.Contains("unreadable", report.ReadingSummary);
     }
 
     [Fact]

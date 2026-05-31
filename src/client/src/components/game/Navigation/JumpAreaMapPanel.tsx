@@ -11,7 +11,6 @@ import {
   jumpAreaMajorGridStepLightYears,
   jumpAreaMinimumViewLightYears,
 } from './constants'
-import { formatPercent } from './formatters'
 import { getMapCenterPosition } from './mapMath'
 import { StellarMapView } from './StellarMapView'
 import { StellarReadout } from './StellarReadout'
@@ -40,7 +39,11 @@ export function JumpAreaMapPanel({
   gizmoReferenceSpan: number
   gravityScanner: GravityScanner
   map: JumpAreaMap
-  onCaptureEmScanReport: (focus: number, filter: number) => Promise<void>
+  onCaptureEmScanReport: (
+    focus: number,
+    filter: number,
+    phaseErrorRadians: number,
+  ) => Promise<void>
   onStartEmScan: (x: number, y: number) => Promise<void>
   onSelectSystem: (systemId: string) => void
   onStartGravityScan: () => Promise<void>
@@ -141,17 +144,19 @@ export function JumpAreaMapPanel({
           scanActive={emScan !== null}
           targeting={emTargetingActive}
         />
-        {emScan ? (
-          <EmScannerPanel
-            onCaptureEmScanReport={onCaptureEmScanReport}
-            onStopEmScan={onStopEmScan}
-            scan={emScan}
-          />
-        ) : null}
         {selectedEmReport ? (
           <EmScanReportPanel report={selectedEmReport} />
         ) : null}
       </StellarReadout>
+      {emScan ? (
+        <EmScannerDialog
+          onCaptureEmScanReport={onCaptureEmScanReport}
+          onSelectEmReport={setSelectedEmReportId}
+          onStopEmScan={onStopEmScan}
+          reportCount={emScanner.reports.length}
+          scan={emScan}
+        />
+      ) : null}
     </div>
   )
 }
@@ -293,84 +298,162 @@ function EmScannerControl({
   )
 }
 
-function EmScannerPanel({
+function EmScannerDialog({
   onCaptureEmScanReport,
+  onSelectEmReport,
   onStopEmScan,
+  reportCount,
   scan,
 }: {
-  onCaptureEmScanReport: (focus: number, filter: number) => Promise<void>
+  onCaptureEmScanReport: (
+    focus: number,
+    filter: number,
+    phaseErrorRadians: number,
+  ) => Promise<void>
+  onSelectEmReport: (reportId: string) => void
   onStopEmScan: () => Promise<void>
+  reportCount: number
   scan: NonNullable<EmScanner['currentScan']>
 }) {
-  const [filter, setFilter] = useState(52)
-  const [focus, setFocus] = useState(52)
+  const [filter, setFilter] = useState(50)
+  const [focus, setFocus] = useState(50)
+  const [snapshotPending, setSnapshotPending] = useState(false)
+  const phaseErrorRef = useRef(0)
+  const snapshotPendingRef = useRef(false)
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        void onStopEmScan()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onStopEmScan])
+
+  async function handleSnapshot() {
+    if (snapshotPendingRef.current) {
+      return
+    }
+
+    snapshotPendingRef.current = true
+    setSnapshotPending(true)
+
+    try {
+      const nextReportId = formatEmScanReportId(scan.id, reportCount + 1)
+
+      await onCaptureEmScanReport(focus, filter, phaseErrorRef.current)
+      onSelectEmReport(nextReportId)
+      await onStopEmScan()
+    } catch {
+      snapshotPendingRef.current = false
+      setSnapshotPending(false)
+    }
+  }
 
   return (
-    <section
-      className="grid gap-3 rounded-md border border-[#36534f] bg-[rgb(5_12_13_/_88%)] p-3"
+    <div
       aria-label="EM scan signal"
+      aria-modal="true"
+      className="fixed inset-0 z-50 grid min-h-0 place-items-center bg-[rgb(1_4_5_/_88%)] p-5 text-left backdrop-blur-sm max-[800px]:p-3"
+      role="dialog"
     >
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <div className="grid min-w-0 gap-0.5">
-          <span className="text-[10px] uppercase text-[#7f999a]">
-            EM Signal
-          </span>
-          <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[#eef6f4]">
-            {formatEmTarget(scan.target.x, scan.target.y)}
-          </strong>
+      <section className="grid max-h-[calc(100svh-40px)] w-full max-w-[1120px] grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden rounded-md border border-[#36534f] bg-[rgb(5_12_13_/_96%)] p-4 shadow-[0_22px_90px_rgb(0_0_0_/_65%)] max-[800px]:max-h-[calc(100svh-24px)] max-[800px]:p-3">
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="grid min-w-0 gap-0.5">
+            <span className="text-[10px] uppercase text-[#7f999a]">
+              EM Signal
+            </span>
+            <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-base text-[#eef6f4]">
+              {formatEmTarget(scan.target.x, scan.target.y)}
+            </strong>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              className="min-h-8 cursor-pointer rounded-md border border-[#4d6b68] bg-[#d7ece5] px-3 text-xs font-[750] uppercase tracking-normal text-[#071011] enabled:hover:bg-[#f0fff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4f7f7]"
+              disabled={snapshotPending}
+              onClick={() => {
+                void handleSnapshot()
+              }}
+              type="button"
+            >
+              Snapshot
+            </button>
+            <button
+              className="min-h-8 cursor-pointer rounded-md border border-[#4d6b68] bg-transparent px-3 text-xs font-[750] uppercase tracking-normal text-[#dce7e5] enabled:hover:bg-[#162021] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4f7f7]"
+              onClick={() => {
+                void onStopEmScan()
+              }}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            className="min-h-8 cursor-pointer rounded-md border border-[#4d6b68] bg-[#d7ece5] px-3 text-xs font-[750] uppercase tracking-normal text-[#071011] enabled:hover:bg-[#f0fff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4f7f7]"
-            onClick={() => {
-              void onCaptureEmScanReport(focus / 100, filter / 100)
-            }}
-            type="button"
-          >
-            Snapshot
-          </button>
-          <button
-            className="min-h-8 cursor-pointer rounded-md border border-[#4d6b68] bg-transparent px-3 text-xs font-[750] uppercase tracking-normal text-[#dce7e5] enabled:hover:bg-[#162021] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4f7f7]"
-            onClick={() => {
-              void onStopEmScan()
-            }}
-            type="button"
-          >
-            Close
-          </button>
+
+        <EmNoiseSignal
+          filter={filter}
+          focus={focus}
+          onPhaseErrorChange={(nextPhaseError) => {
+            phaseErrorRef.current = nextPhaseError
+          }}
+          signalProfile={scan.signalProfile}
+        />
+
+        <div className="grid gap-4">
+          {/*
+            Signal Quality bar temporarily removed from the scanner UI.
+            Easy-mode signal quality can be restored here later.
+          */}
+
+          <div className="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
+            <label className="grid gap-1 text-[11px] uppercase text-[#91aaaa]">
+              <span className="flex items-center justify-between gap-3">
+                <span>Filter</span>
+                <span>{filter.toFixed(1)}</span>
+              </span>
+              <input
+                className="h-4 accent-[#70d6bd]"
+                max="100"
+                min="1"
+                onChange={(event) => setFilter(Number(event.target.value))}
+                step="0.5"
+                type="range"
+                value={filter}
+              />
+            </label>
+
+            <label className="grid gap-1 text-[11px] uppercase text-[#91aaaa]">
+              <span className="flex items-center justify-between gap-3">
+                <span>Focus</span>
+                <span>{focus.toFixed(1)}</span>
+              </span>
+              <input
+                className="h-4 accent-[#d4d56f]"
+                max="100"
+                min="1"
+                onChange={(event) => setFocus(Number(event.target.value))}
+                step="0.5"
+                type="range"
+                value={focus}
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-5 gap-2 text-[10px] uppercase text-[#91aaaa] max-[900px]:grid-cols-3 max-[720px]:grid-cols-1">
+            <WaveLegendItem primary label="Primary" />
+            <WaveLegendItem label="Secondary" />
+            <LegendItem color="#3ddc84" label="Aligned" />
+            <LegendItem color="#ff4c56" label="Drift" />
+            <LegendItem color="#d7ece5" label="Filter" />
+          </div>
         </div>
-      </div>
-
-      <EmNoiseSignal
-        filter={filter}
-        focus={focus}
-        signalProfile={scan.signalProfile}
-      />
-
-      <label className="grid gap-1 text-[11px] uppercase text-[#91aaaa]">
-        <span>Filter</span>
-        <input
-          className="h-4 accent-[#70d6bd]"
-          max="100"
-          min="0"
-          onChange={(event) => setFilter(Number(event.target.value))}
-          type="range"
-          value={filter}
-        />
-      </label>
-
-      <label className="grid gap-1 text-[11px] uppercase text-[#91aaaa]">
-        <span>Focus</span>
-        <input
-          className="h-4 accent-[#d4d56f]"
-          max="100"
-          min="0"
-          onChange={(event) => setFocus(Number(event.target.value))}
-          type="range"
-          value={focus}
-        />
-      </label>
-    </section>
+      </section>
+    </div>
   )
 }
 
@@ -394,83 +477,127 @@ function EmScanReportPanel({ report }: { report: EmScanReport }) {
         </span>
       </div>
 
-      <div className="grid gap-2">
-        <MetricBar label="Signal Strength" value={report.signalStrength} />
-        <MetricBar label="Coherence" value={report.coherence} />
-        <MetricBar label="Drift Stability" value={report.driftStability} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <ReportValue
-          label="Speed"
-          value={
-            report.estimatedSpeedKilometersPerSecond === null
-              ? '--'
-              : formatEmSpeed(report.estimatedSpeedKilometersPerSecond)
-          }
-        />
-        <ReportValue
-          label="Angle"
-          value={
-            report.estimatedAngleDegrees === null
-              ? '--'
-              : `${Math.round(report.estimatedAngleDegrees)} deg`
-          }
-        />
-        <ReportValue
-          label="Distortion"
-          value={
-            report.estimatedDistortion === null
-              ? '--'
-              : formatPercent(report.estimatedDistortion)
-          }
-        />
-        <ReportValue label="Confidence" value={formatConfidence(report.confidence)} />
+      <div className="grid gap-2 rounded-md border border-[#1d282a] bg-[#060909] p-3">
+        <p className="text-sm leading-6 text-[#dce7e5]">
+          {report.readingSummary}
+        </p>
+        <p className="text-[11px] uppercase text-[#7f999a]">
+          Follow-up: {report.recommendedFollowUp}
+        </p>
       </div>
     </section>
   )
 }
 
-function MetricBar({ label, value }: { label: string; value: number }) {
-  const percentage = Math.round(value * 100)
-
+function LegendItem({ color, label }: { color: string; label: string }) {
   return (
-    <div className="grid gap-1">
-      <div className="flex items-center justify-between gap-3 text-[11px] uppercase text-[#91aaaa]">
-        <span>{label}</span>
-        <span>{percentage}%</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-[#10191a]">
-        <div
-          className="h-full rounded-full bg-[#70d6bd]"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-    </div>
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <span
+        className="size-2 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+        {label}
+      </span>
+    </span>
   )
 }
 
-function ReportValue({ label, value }: { label: string; value: string }) {
+function WaveLegendItem({
+  label,
+  primary = false,
+}: {
+  label: string
+  primary?: boolean
+}) {
   return (
-    <div className="grid min-w-0 gap-0.5 rounded-md border border-[#1d282a] bg-[#060909] p-2">
-      <span className="text-[10px] uppercase text-[#7f999a]">{label}</span>
-      <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-[#dce7e5]">
-        {value}
-      </strong>
-    </div>
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <span
+        className={cx(
+          'h-0 w-7 shrink-0 rounded-full border-[#70d6bd]',
+          primary
+            ? 'border-t-[3px] shadow-[0_0_7px_rgb(112_214_189_/_70%)]'
+            : 'border-t',
+        )}
+      />
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+        {label}
+      </span>
+    </span>
   )
 }
+
+type EmSignalProfile = NonNullable<EmScanner['currentScan']>['signalProfile']
+
+type EmSignalControls = {
+  filter: number
+  focus: number
+}
+
+type EmNoisePulse = {
+  startedAt: number
+  duration: number
+  primaryAmplitude: number
+  secondaryAmplitude: number
+}
+
+type EmWaveRenderStyle = {
+  alpha?: number
+  glow?: number
+  lineWidth: number
+  offsetY?: number
+}
+
+type RgbColor = {
+  r: number
+  g: number
+  b: number
+}
+
+const scannerSampleSpacing = 2
+const scannerScrollSpeed = 144
+const scannerMaximumNoiseFrequency = 14
+const scannerMinimumNoiseIntensity = 20
+const scannerMaximumNoiseIntensity = 120
+const scannerMinimumWavelength = 80
+const scannerMaximumWavelength = 620
+
+const signalGreen: RgbColor = { r: 61, g: 220, b: 132 }
+const signalPurple: RgbColor = { r: 174, g: 98, b: 255 }
+const signalRed: RgbColor = { r: 255, g: 76, b: 86 }
 
 function EmNoiseSignal({
   filter,
   focus,
+  onPhaseErrorChange,
   signalProfile,
 }: {
   filter: number
   focus: number
-  signalProfile: NonNullable<EmScanner['currentScan']>['signalProfile']
+  onPhaseErrorChange: (phaseErrorRadians: number) => void
+  signalProfile: EmSignalProfile
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const controlsRef = useRef<EmSignalControls>({ filter, focus })
+  const phaseCallbackRef = useRef(onPhaseErrorChange)
+  const {
+    baseAmplitude,
+    baseStrength,
+    idealFilter,
+    idealFocus,
+    lockState,
+    noiseSeed,
+    phaseShiftRadians,
+    primaryWavelength,
+  } = signalProfile
+
+  useEffect(() => {
+    controlsRef.current = { filter, focus }
+  }, [filter, focus])
+
+  useEffect(() => {
+    phaseCallbackRef.current = onPhaseErrorChange
+  }, [onPhaseErrorChange])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -487,107 +614,417 @@ function EmNoiseSignal({
 
     const signalCanvas = canvas
     const signalContext = context
-    const normalizedFilter = filter / 100
-    const normalizedFocus = focus / 100
-    const focusMismatch = Math.abs(normalizedFocus - signalProfile.focusBias)
-    const filterMismatch = Math.abs(normalizedFilter - signalProfile.filterBias)
-    const waveStrength =
-      signalProfile.baseStrength * (1.1 - (normalizedFilter * 0.45))
-    const instability =
-      signalProfile.noiseLevel * (1 - normalizedFilter) +
-      (focusMismatch * 0.4) +
-      (filterMismatch * 0.25)
+    const activeSignalProfile = {
+      baseAmplitude,
+      baseStrength,
+      idealFilter,
+      idealFocus,
+      lockState,
+      noiseSeed,
+      phaseShiftRadians,
+      primaryWavelength,
+    }
     let frameId = 0
-    let lastY = 0
-    let phase = signalProfile.noiseSeed % 360
+    let viewportWidth = 0
+    let viewportHeight = 0
+    let primaryPhase = getInitialPhase(activeSignalProfile.noiseSeed)
+    let secondaryPhase = primaryPhase
+    let primarySamples: number[] = []
+    let secondarySamples: number[] = []
+    let noisePulses: EmNoisePulse[] = []
+    let scrollRemainder = 0
+    let lastFrameTime = performance.now()
+    let lastPhaseReportTime = 0
+    let nextPulseAt = lastFrameTime
+    let randomState = activeSignalProfile.noiseSeed || 1
 
     function resize() {
       const bounds = signalCanvas.getBoundingClientRect()
       const pixelRatio = window.devicePixelRatio || 1
-      const width = Math.max(1, Math.floor(bounds.width * pixelRatio))
-      const height = Math.max(1, Math.floor(bounds.height * pixelRatio))
+      const nextViewportWidth = Math.max(1, bounds.width)
+      const nextViewportHeight = Math.max(1, bounds.height)
+      const canvasWidth = Math.max(1, Math.floor(nextViewportWidth * pixelRatio))
+      const canvasHeight = Math.max(1, Math.floor(nextViewportHeight * pixelRatio))
+      const sizeChanged =
+        signalCanvas.width !== canvasWidth ||
+        signalCanvas.height !== canvasHeight
 
-      if (signalCanvas.width !== width || signalCanvas.height !== height) {
-        signalCanvas.width = width
-        signalCanvas.height = height
-        lastY = height / 2
-        signalContext.fillStyle = '#020505'
-        signalContext.fillRect(0, 0, width, height)
+      viewportWidth = nextViewportWidth
+      viewportHeight = nextViewportHeight
+
+      if (sizeChanged) {
+        signalCanvas.width = canvasWidth
+        signalCanvas.height = canvasHeight
+        signalContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+        resetWaveState()
       }
     }
 
-    function draw() {
-      resize()
+    function resetWaveState() {
+      primaryPhase = getInitialPhase(activeSignalProfile.noiseSeed)
+      secondaryPhase = primaryPhase
+      primarySamples = []
+      secondarySamples = []
+      noisePulses = []
+      scrollRemainder = 0
+      nextPulseAt = performance.now()
+      randomState = activeSignalProfile.noiseSeed || 1
+    }
 
-      const { width, height } = signalCanvas
-      const step = Math.max(2, Math.floor(width / 160))
-      const primary =
-        Math.sin(phase * signalProfile.primaryFrequency) *
-        height *
-        (0.05 + (waveStrength * 0.24))
-      const drift =
-        Math.sin((phase * signalProfile.driftFrequency) + 1.8) *
-        height *
-        (0.03 + (normalizedFocus * 0.12))
-      const jitter = SignedRandom() * height * Math.min(0.32, instability * 0.18)
-      const nextY = Math.max(
-        4,
-        Math.min(
-          height - 4,
-          height / 2 + primary + drift + jitter,
-        ),
-      )
+    function nextRandom() {
+      randomState += 0x6d2b79f5
 
-      signalContext.drawImage(signalCanvas, -step, 0)
-      signalContext.fillStyle = '#020505'
-      signalContext.fillRect(width - step, 0, step, height)
+      let value = randomState
+      value = Math.imul(value ^ (value >>> 15), value | 1)
+      value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
 
-      for (let index = 0; index < height / 2; index += 1) {
-        const y = Math.random() * height
-        const alpha = 0.04 + Math.random() * Math.min(0.42, instability)
+      return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296
+    }
 
-        signalContext.fillStyle = `rgba(112, 214, 189, ${alpha})`
-        signalContext.fillRect(width - step, y, step, 1)
+    function enqueueNoisePulses(timestamp: number, settings: EmWaveSettings) {
+      const pulseInterval = 1_000 / Math.max(0.1, settings.actualNoiseFrequency)
+      let pulseCount = 0
+
+      while (timestamp >= nextPulseAt && pulseCount < 8) {
+        const noiseAmount = settings.actualNoiseIntensity / 100
+
+        noisePulses.push({
+          startedAt: nextPulseAt,
+          duration: 180 + (nextRandom() * 360),
+          primaryAmplitude:
+            signedSeededRandom(nextRandom()) *
+            settings.baseAmplitude *
+            noiseAmount,
+          secondaryAmplitude:
+            signedSeededRandom(nextRandom()) *
+            settings.baseAmplitude *
+            noiseAmount,
+        })
+        nextPulseAt += pulseInterval
+        pulseCount += 1
       }
 
-      signalContext.strokeStyle = 'rgba(215, 236, 229, 0.86)'
-      signalContext.lineWidth = Math.max(1, Math.floor(width / 260))
-      signalContext.beginPath()
-      signalContext.moveTo(width - step - 1, lastY)
-      signalContext.lineTo(width - 1, nextY)
-      signalContext.stroke()
+      noisePulses = noisePulses.filter(
+        (pulse) => timestamp - pulse.startedAt <= pulse.duration,
+      )
+    }
 
-      lastY = nextY
-      phase += 0.035
+    function getCurrentNoise(timestamp: number) {
+      let primaryNoise = 0
+      let secondaryNoise = 0
+
+      for (const pulse of noisePulses) {
+        const progress = clamp(
+          (timestamp - pulse.startedAt) / pulse.duration,
+          0,
+          1,
+        )
+        const envelope = Math.sin(progress * Math.PI)
+
+        primaryNoise += pulse.primaryAmplitude * envelope
+        secondaryNoise += pulse.secondaryAmplitude * envelope
+      }
+
+      return { primaryNoise, secondaryNoise }
+    }
+
+    function generateSample(timestamp: number) {
+      const settings = getEmWaveSettings(
+        activeSignalProfile,
+        controlsRef.current,
+      )
+
+      enqueueNoisePulses(timestamp, settings)
+
+      const { primaryNoise, secondaryNoise } = getCurrentNoise(timestamp)
+      const maximumAmplitude = viewportHeight * 0.42
+      const effectivePrimaryAmplitude = clamp(
+        settings.baseAmplitude + primaryNoise,
+        4,
+        maximumAmplitude,
+      )
+      const effectiveSecondaryAmplitude = clamp(
+        settings.baseAmplitude + secondaryNoise,
+        4,
+        maximumAmplitude,
+      )
+      const centerY = viewportHeight / 2
+      const primaryY =
+        centerY + (Math.sin(primaryPhase) * effectivePrimaryAmplitude)
+      const secondaryY =
+        centerY +
+        (Math.sin(secondaryPhase + activeSignalProfile.phaseShiftRadians) *
+          effectiveSecondaryAmplitude)
+
+      primaryPhase +=
+        (Math.PI * 2 * scannerSampleSpacing) / settings.primaryWavelength
+      secondaryPhase +=
+        (Math.PI * 2 * scannerSampleSpacing) / settings.secondWavelength
+
+      if (primaryPhase > 1_000_000 || secondaryPhase > 1_000_000) {
+        primaryPhase = normalizePositivePhase(primaryPhase)
+        secondaryPhase = normalizePositivePhase(secondaryPhase)
+      }
+
+      primarySamples.push(primaryY)
+      secondarySamples.push(secondaryY)
+    }
+
+    function trimSamples() {
+      const sampleLimit = Math.ceil(viewportWidth / scannerSampleSpacing) + 4
+
+      while (primarySamples.length > sampleLimit) {
+        primarySamples.shift()
+        secondarySamples.shift()
+      }
+    }
+
+    function drawBackground() {
+      signalContext.fillStyle = '#020505'
+      signalContext.fillRect(0, 0, viewportWidth, viewportHeight)
+      signalContext.strokeStyle = 'rgba(112, 214, 189, 0.08)'
+      signalContext.lineWidth = 1
+
+      for (let x = 0; x <= viewportWidth; x += 24) {
+        signalContext.beginPath()
+        signalContext.moveTo(x, 0)
+        signalContext.lineTo(x, viewportHeight)
+        signalContext.stroke()
+      }
+
+      for (let y = 0; y <= viewportHeight; y += 24) {
+        signalContext.beginPath()
+        signalContext.moveTo(0, y)
+        signalContext.lineTo(viewportWidth, y)
+        signalContext.stroke()
+      }
+
+      signalContext.strokeStyle = 'rgba(215, 236, 229, 0.16)'
+      signalContext.beginPath()
+      signalContext.moveTo(0, viewportHeight / 2)
+      signalContext.lineTo(viewportWidth, viewportHeight / 2)
+      signalContext.stroke()
+    }
+
+    function drawWave(
+      samples: number[],
+      color: string,
+      {
+        alpha = 1,
+        glow = 0,
+        lineWidth,
+        offsetY = 0,
+      }: EmWaveRenderStyle,
+    ) {
+      if (samples.length < 2) {
+        return
+      }
+
+      function tracePath() {
+        signalContext.beginPath()
+
+        samples.forEach((sample, index) => {
+          const samplesFromRight = samples.length - 1 - index
+          const x =
+            viewportWidth -
+            (samplesFromRight * scannerSampleSpacing) -
+            scrollRemainder
+          const y = sample + offsetY
+
+          if (index === 0) {
+            signalContext.moveTo(x, y)
+          } else {
+            signalContext.lineTo(x, y)
+          }
+        })
+
+        signalContext.stroke()
+      }
+
+      signalContext.save()
+      signalContext.lineCap = 'round'
+      signalContext.lineJoin = 'round'
+      signalContext.globalAlpha = alpha
+      signalContext.strokeStyle = color
+      signalContext.lineWidth = lineWidth
+      signalContext.shadowBlur = glow
+      signalContext.shadowColor = color
+      tracePath()
+      signalContext.restore()
+    }
+
+    function draw(timestamp: number) {
+      resize()
+
+      const elapsedSeconds = Math.min(
+        0.1,
+        Math.max(0, (timestamp - lastFrameTime) / 1_000),
+      )
+
+      lastFrameTime = timestamp
+      scrollRemainder += scannerScrollSpeed * elapsedSeconds
+
+      while (scrollRemainder >= scannerSampleSpacing) {
+        generateSample(timestamp)
+        scrollRemainder -= scannerSampleSpacing
+      }
+
+      trimSamples()
+
+      const phaseError = normalizeSignedPhase(secondaryPhase - primaryPhase)
+      const driftAmount = clamp(Math.abs(phaseError) / Math.PI, 0, 1)
+      const primaryTarget = phaseError >= 0 ? signalPurple : signalRed
+      const secondaryTarget = phaseError >= 0 ? signalRed : signalPurple
+      const primaryColor = formatRgb(mixRgb(signalGreen, primaryTarget, driftAmount))
+      const secondaryColor = formatRgb(
+        mixRgb(signalGreen, secondaryTarget, driftAmount),
+      )
+
+      drawBackground()
+      drawWave(primarySamples, primaryColor, {
+        alpha: 0.98,
+        glow: 9,
+        lineWidth: 2.8,
+      })
+      drawWave(secondarySamples, secondaryColor, {
+        alpha: 0.9,
+        lineWidth: 1.35,
+      })
+
+      if (timestamp - lastPhaseReportTime >= 120) {
+        phaseCallbackRef.current(phaseError)
+        lastPhaseReportTime = timestamp
+      }
+
       frameId = window.requestAnimationFrame(draw)
     }
 
-    draw()
+    frameId = window.requestAnimationFrame(draw)
 
     return () => {
       window.cancelAnimationFrame(frameId)
     }
-  }, [filter, focus, signalProfile])
+  }, [
+    baseAmplitude,
+    baseStrength,
+    idealFilter,
+    idealFocus,
+    lockState,
+    noiseSeed,
+    phaseShiftRadians,
+    primaryWavelength,
+  ])
 
   return (
     <canvas
       aria-label="EM signal noise"
-      className="h-24 w-full rounded-md border border-[#1f3534] bg-[#020505]"
+      className="h-[min(52svh,460px)] min-h-[260px] w-full min-w-0 rounded-md border border-[#1f3534] bg-[#020505] max-[800px]:h-[min(40svh,320px)] max-[800px]:min-h-[180px]"
       ref={canvasRef}
     />
   )
 }
 
-function SignedRandom() {
-  return (Math.random() * 2) - 1
+type EmWaveSettings = {
+  baseAmplitude: number
+  primaryWavelength: number
+  secondWavelength: number
+  actualNoiseIntensity: number
+  actualNoiseFrequency: number
+}
+
+function getEmWaveSettings(
+  signalProfile: EmSignalProfile,
+  controls: EmSignalControls,
+): EmWaveSettings {
+  const noiseFactor = getFilterNoiseFactor(
+    controls.filter,
+    signalProfile.idealFilter,
+  )
+  const actualNoiseIntensity =
+    scannerMinimumNoiseIntensity +
+    ((scannerMaximumNoiseIntensity - scannerMinimumNoiseIntensity) *
+      noiseFactor)
+
+  return {
+    baseAmplitude: signalProfile.baseAmplitude,
+    primaryWavelength: signalProfile.primaryWavelength,
+    secondWavelength: getSecondWavelength(signalProfile, controls.focus),
+    actualNoiseIntensity,
+    actualNoiseFrequency:
+      scannerMaximumNoiseFrequency *
+      (actualNoiseIntensity / scannerMaximumNoiseIntensity),
+  }
+}
+
+function getSecondWavelength(signalProfile: EmSignalProfile, focus: number) {
+  const primaryWavelength = signalProfile.primaryWavelength
+  const idealFocus = signalProfile.idealFocus
+  let secondWavelength = primaryWavelength
+
+  if (focus < idealFocus) {
+    const ratio = (idealFocus - focus) / Math.max(1, idealFocus - 1)
+    secondWavelength =
+      primaryWavelength +
+      ((scannerMaximumWavelength - primaryWavelength) * ratio)
+  } else if (focus > idealFocus) {
+    const ratio = (focus - idealFocus) / Math.max(1, 100 - idealFocus)
+    secondWavelength =
+      primaryWavelength +
+      ((scannerMinimumWavelength - primaryWavelength) * ratio)
+  }
+
+  return clamp(
+    Math.round(secondWavelength),
+    scannerMinimumWavelength,
+    scannerMaximumWavelength,
+  )
+}
+
+function getFilterNoiseFactor(filter: number, idealFilter: number) {
+  const distance = Math.abs(filter - idealFilter)
+  const maxDistance = Math.max(idealFilter, 100 - idealFilter)
+
+  return clamp(distance / Math.max(1, maxDistance), 0, 1)
+}
+
+function getInitialPhase(seed: number) {
+  return ((seed % 10_000) / 10_000) * Math.PI * 2
+}
+
+function normalizePositivePhase(radians: number) {
+  return ((radians % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2)
+}
+
+function normalizeSignedPhase(radians: number) {
+  return Math.atan2(Math.sin(radians), Math.cos(radians))
+}
+
+function signedSeededRandom(value: number) {
+  return (value * 2) - 1
+}
+
+function mixRgb(start: RgbColor, end: RgbColor, amount: number): RgbColor {
+  return {
+    r: Math.round(start.r + ((end.r - start.r) * amount)),
+    g: Math.round(start.g + ((end.g - start.g) * amount)),
+    b: Math.round(start.b + ((end.b - start.b) * amount)),
+  }
+}
+
+function formatRgb(color: RgbColor) {
+  return `rgb(${color.r}, ${color.g}, ${color.b})`
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value))
+}
+
+function formatEmScanReportId(scanId: string, reportNumber: number) {
+  return `${scanId}-report-${reportNumber.toString().padStart(3, '0')}`
 }
 
 function formatEmTarget(x: number, y: number) {
   return `${x.toFixed(3)}, ${y.toFixed(3)} ly`
-}
-
-function formatEmSpeed(kilometersPerSecond: number) {
-  return `${kilometersPerSecond.toFixed(3)} km/s`
 }
 
 function formatLockState(lockState: EmScanReport['lockState']) {
@@ -600,23 +1037,6 @@ function formatLockState(lockState: EmScanReport['lockState']) {
       return 'Weak lock'
     case 'no-signal':
       return 'No signal'
-  }
-}
-
-function formatConfidence(confidence: EmScanReport['confidence']) {
-  switch (confidence) {
-    case 'low-medium':
-      return 'Low-medium'
-    case 'absolute':
-      return 'Absolute'
-    case 'high':
-      return 'High'
-    case 'medium':
-      return 'Medium'
-    case 'low':
-      return 'Low'
-    case 'none':
-      return 'None'
   }
 }
 

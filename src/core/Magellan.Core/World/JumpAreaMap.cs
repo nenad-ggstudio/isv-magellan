@@ -16,10 +16,10 @@ public sealed record SensorAnomaly(
     string Label,
     double X,
     double Y,
-    double Distance,
-    double Speed,
+    int Speed,
     double Angle,
-    double Distortion
+    int Mass,
+    int Energy
 );
 
 public static class SensorAnomalyKinds

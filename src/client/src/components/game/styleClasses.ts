@@ -29,7 +29,7 @@ export const scanSummaryValue =
   'overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[#eef6f4]'
 
 export const detailPanel =
-  'grid min-h-0 content-start gap-3.5 overflow-auto rounded-md border border-[#1d282a] bg-[rgb(4_8_9_/_76%)] p-3.5 text-left'
+  'grid min-h-[180px] content-start gap-3.5 overflow-auto rounded-md border border-[#1d282a] bg-[rgb(4_8_9_/_76%)] p-3.5 text-left'
 
 export const emptyDetailPanel =
   'place-content-center text-center'
@@ -69,7 +69,7 @@ export const resourceValue = 'text-xs font-[650] text-[#dce7e5]'
 export const resourceMeta = 'col-start-2 text-[11px] text-[#91aaaa]'
 
 export const readoutShell =
-  'grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-3.5'
+  'grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-3.5 overflow-y-auto pr-1 [scrollbar-color:#36534f_transparent]'
 
 export const navigationContent =
   'grid min-h-0 min-w-0 grid-cols-[minmax(260px,1fr)_minmax(230px,300px)] gap-[18px] max-[800px]:grid-cols-1 max-[800px]:grid-rows-[minmax(220px,0.9fr)_minmax(230px,1fr)] max-[800px]:gap-3.5'

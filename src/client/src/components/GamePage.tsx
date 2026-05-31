@@ -8,7 +8,11 @@ import type { ActiveGameState, GameTick } from '../gameTypes'
 type GamePageProps = {
   connectionState: string
   game: ActiveGameState
-  onCaptureEmScanReport: (focus: number, filter: number) => Promise<void>
+  onCaptureEmScanReport: (
+    focus: number,
+    filter: number,
+    phaseErrorRadians: number,
+  ) => Promise<void>
   onStartEmScan: (x: number, y: number) => Promise<void>
   onStartGravityScan: () => Promise<void>
   onStopEmScan: () => Promise<void>

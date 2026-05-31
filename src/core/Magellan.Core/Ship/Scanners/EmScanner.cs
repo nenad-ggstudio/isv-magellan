@@ -13,7 +13,10 @@ public sealed record EmScanner(
     public const int PowerDrainIntervalTicks = 10;
     public const double PowerDrainChargeLevel = 0.001;
 
-    private const double MinimumSignalStrength = 0.02;
+    private const double MinimumAmplitudePixels = 10;
+    private const double MaximumAmplitudePixels = 180;
+    private const double MinimumWavelengthPixels = 80;
+    private const double MaximumWavelengthPixels = 620;
 
     public static EmScanner StartingScanner()
     {
@@ -84,21 +87,23 @@ public sealed record EmScanner(
         long capturedAtTick,
         JumpAreaMap jumpAreaMap,
         double focus,
-        double filter)
+        double filter,
+        double phaseErrorRadians)
     {
         if (CurrentScan is null)
         {
             return this;
         }
 
-        var normalizedFocus = Clamp(focus, 0, 1);
-        var normalizedFilter = Clamp(filter, 0, 1);
+        var clampedFocus = Clamp(focus, 1, 100);
+        var clampedFilter = Clamp(filter, 1, 100);
         var report = BuildReport(
             CurrentScan,
             jumpAreaMap,
             capturedAtTick,
-            normalizedFocus,
-            normalizedFilter,
+            clampedFocus,
+            clampedFilter,
+            NormalizeSignedPhase(phaseErrorRadians),
             Reports.Count + 1);
 
         return this with
@@ -113,70 +118,41 @@ public sealed record EmScanner(
         long capturedAtTick,
         double focus,
         double filter,
+        double phaseErrorRadians,
         int reportNumber)
     {
         var candidate = FindStrongestAnomaly(jumpAreaMap, scan.Target, scan.RadiusLightYears);
         var reportId = $"{scan.Id}-report-{reportNumber:000}";
+        var phaseScore = GetPhaseScore(phaseErrorRadians);
 
         if (candidate is null)
         {
-            var noSignalRandom = new Random(BuildReportSeed(scan.Id, "no-signal", focus, filter));
-            var noSignalStrength = 0.03 + (noSignalRandom.NextDouble() * 0.12);
-            var noSignalCoherence = noSignalRandom.NextDouble() * 0.22;
-            var noSignalDriftStability = noSignalRandom.NextDouble() * 0.18;
-
             return new EmScanReport(
                 reportId,
                 scan.Id,
                 capturedAtTick,
                 scan.Target,
                 scan.RadiusLightYears,
-                Math.Round(noSignalStrength, 3),
-                Math.Round(noSignalCoherence, 3),
-                Math.Round(noSignalDriftStability, 3),
-                null,
-                null,
-                null,
-                "none",
+                0,
+                0,
+                Math.Round(phaseScore, 3),
+                EmScanConfidenceLabels.Unstable,
                 EmScanLockStates.NoSignal,
-                Math.Round(focus, 3),
-                Math.Round(filter, 3));
+                Math.Round(focus, 1),
+                Math.Round(filter, 1),
+                BuildNoSignalReading(),
+                "Reposition scanner");
         }
 
         var (anomaly, distance, proximitySignal) = candidate.Value;
-        var focusIdeal = 1 - anomaly.Distortion;
-        var filterIdeal = Clamp(0.25 + (anomaly.Distortion * 0.55), 0, 1);
-        var focusFit = Fit(focus, focusIdeal);
-        var filterFit = Fit(filter, filterIdeal);
-        var signalStrength = Clamp(
-            MinimumSignalStrength + (proximitySignal * (1.08 - (filter * 0.48))),
-            0,
-            1);
-        var coherence = Clamp(
-            (focusFit * 0.82)
-            + (signalStrength * 0.18)
-            - (Math.Abs(focus - focusIdeal) * anomaly.Distortion * 0.18),
-            0,
-            1);
-        var driftStability = Clamp(
-            (filterFit * (0.72 + (focusFit * 0.22)))
-            - ((1 - filter) * anomaly.Distortion * 0.12),
-            0,
-            1);
-        var accuracy = Clamp((signalStrength + coherence + driftStability) / 3, 0, 1);
-        var random = new Random(BuildReportSeed(scan.Id, anomaly.Id, focus, filter));
-        var speedError = anomaly.Speed * (0.75 * (1 - accuracy));
-        var angleError = 120 * (1 - accuracy);
-        var distortionError = 0.5 * (1 - accuracy);
-        var estimatedSpeed = Math.Max(
-            0,
-            anomaly.Speed + (SignedRandom(random) * speedError));
-        var estimatedAngleDegrees = NormalizeDegrees(
-            RadiansToDegrees(anomaly.Angle) + (SignedRandom(random) * angleError));
-        var estimatedDistortion = Clamp(
-            anomaly.Distortion + (SignedRandom(random) * distortionError),
-            0,
-            1);
+        var filterScore = GetFilterScore(filter, GetIdealFilter(anomaly));
+        var signalConfidence = Clamp((filterScore + phaseScore) / 2, 0, 1);
+        var random = new Random(BuildReportSeed(
+            scan.Id,
+            anomaly.Id,
+            focus,
+            filter,
+            phaseErrorRadians));
 
         return new EmScanReport(
             reportId,
@@ -184,16 +160,15 @@ public sealed record EmScanner(
             capturedAtTick,
             scan.Target,
             scan.RadiusLightYears,
-            Math.Round(signalStrength, 3),
-            Math.Round(coherence, 3),
-            Math.Round(driftStability, 3),
-            Math.Round(estimatedSpeed, 3),
-            Math.Round(estimatedAngleDegrees, 1),
-            Math.Round(estimatedDistortion, 3),
-            GetConfidenceLabel(accuracy),
-            GetLockState(accuracy, distance, scan.RadiusLightYears),
-            Math.Round(focus, 3),
-            Math.Round(filter, 3));
+            Math.Round(signalConfidence, 3),
+            Math.Round(filterScore, 3),
+            Math.Round(phaseScore, 3),
+            GetConfidenceLabel(signalConfidence),
+            GetLockState(signalConfidence, distance, scan.RadiusLightYears),
+            Math.Round(focus, 1),
+            Math.Round(filter, 1),
+            BuildReadingSummary(anomaly, signalConfidence, random),
+            GetRecommendedFollowUp(signalConfidence));
     }
 
     private static EmScanSignalProfile BuildSignalProfile(
@@ -210,28 +185,25 @@ public sealed record EmScanner(
         {
             return new EmScanSignalProfile(
                 unchecked((uint)seed),
-                0.08,
-                0.74,
-                0.5,
-                0.5,
-                1.8,
-                0.8,
+                0,
+                32,
+                350,
+                0,
+                50,
+                50,
                 EmScanLockStates.NoSignal);
         }
 
         var (anomaly, distance, proximitySignal) = candidate.Value;
-        var focusBias = 1 - anomaly.Distortion;
-        var filterBias = Clamp(0.25 + (anomaly.Distortion * 0.55), 0, 1);
-        var noiseLevel = Clamp(0.18 + ((distance / DefaultScanRadiusLightYears) * 0.42), 0, 1);
 
         return new EmScanSignalProfile(
             unchecked((uint)seed),
             Math.Round(Clamp(proximitySignal, 0, 1), 3),
-            Math.Round(noiseLevel, 3),
-            Math.Round(focusBias, 3),
-            Math.Round(filterBias, 3),
-            Math.Round(1.2 + (anomaly.Speed * 0.18), 3),
-            Math.Round(0.7 + (anomaly.Distortion * 1.4), 3),
+            Math.Round(GetAmplitude(anomaly.Mass), 1),
+            Math.Round(GetWavelength(anomaly.Energy), 1),
+            Math.Round(GetPhaseShiftRadians(anomaly.Speed), 4),
+            Math.Round(GetIdealFilter(anomaly), 1),
+            Math.Round(GetIdealFocus(anomaly), 1),
             GetLockState(proximitySignal, distance, DefaultScanRadiusLightYears));
     }
 
@@ -247,7 +219,7 @@ public sealed record EmScanner(
             {
                 var distance = DistanceBetween(target.X, target.Y, anomaly.X, anomaly.Y);
                 var proximity = Clamp(1 - (distance / radiusLightYears), 0, 1);
-                var signal = Math.Pow(proximity, 1.35) * (1 - (anomaly.Distortion * 0.08));
+                var signal = Math.Pow(proximity, 1.35);
 
                 return (Anomaly: anomaly, Distance: distance, Signal: signal);
             })
@@ -279,15 +251,17 @@ public sealed record EmScanner(
         string scanId,
         string anomalyId,
         double focus,
-        double filter)
+        double filter,
+        double phaseErrorRadians)
     {
         unchecked
         {
             var hash = 17;
             hash = FoldHash(hash, scanId);
             hash = FoldHash(hash, anomalyId);
-            hash = FoldHash(hash, (int)(focus * 1000));
-            hash = FoldHash(hash, (int)(filter * 1000));
+            hash = FoldHash(hash, (int)(focus * 10));
+            hash = FoldHash(hash, (int)(filter * 10));
+            hash = FoldHash(hash, (int)(phaseErrorRadians * 10_000));
 
             return hash;
         }
@@ -322,26 +296,132 @@ public sealed record EmScanner(
         return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
     }
 
-    private static double Fit(double value, double ideal)
+    private static double GetAmplitude(int mass)
     {
-        return Clamp(1 - Math.Abs(value - ideal), 0, 1);
+        return Lerp(
+            MinimumAmplitudePixels,
+            MaximumAmplitudePixels,
+            (Clamp(mass, 1, 100) - 1) / 99);
     }
 
-    private static double SignedRandom(Random random)
+    private static double GetWavelength(int energy)
     {
-        return (random.NextDouble() * 2) - 1;
+        return Lerp(
+            MaximumWavelengthPixels,
+            MinimumWavelengthPixels,
+            (Clamp(energy, 1, 100) - 1) / 99);
     }
 
-    private static string GetConfidenceLabel(double accuracy)
+    private static double GetPhaseShiftRadians(int speed)
     {
-        return accuracy switch
+        return Lerp(0, Math.PI, (Clamp(speed, 1, 100) - 1) / 99);
+    }
+
+    private static double GetIdealFilter(SensorAnomaly anomaly)
+    {
+        return (anomaly.Mass + anomaly.Energy) / 2.0;
+    }
+
+    private static double GetIdealFocus(SensorAnomaly anomaly)
+    {
+        return (anomaly.Speed + anomaly.Energy) / 2.0;
+    }
+
+    private static double GetFilterScore(double filter, double idealFilter)
+    {
+        var distance = Math.Abs(filter - idealFilter);
+        var maxDistance = Math.Max(idealFilter, 100 - idealFilter);
+        var noiseFactor = Clamp(distance / Math.Max(1, maxDistance), 0, 1);
+
+        return 1 - noiseFactor;
+    }
+
+    private static double GetPhaseScore(double phaseErrorRadians)
+    {
+        var driftAmount = Clamp(
+            Math.Abs(NormalizeSignedPhase(phaseErrorRadians)) / Math.PI,
+            0,
+            1);
+
+        return 1 - driftAmount;
+    }
+
+    private static string BuildNoSignalReading()
+    {
+        return "No stable anomaly reading. Waveform alignment did not isolate a source; mass or energy output and motion or energy output are unreadable.";
+    }
+
+    private static string BuildReadingSummary(
+        SensorAnomaly anomaly,
+        double confidence,
+        Random random)
+    {
+        if (confidence < 0.35)
         {
-            >= 0.96 => "absolute",
-            >= 0.78 => "high",
-            >= 0.58 => "medium",
-            >= 0.36 => "low-medium",
-            > 0.16 => "low",
-            _ => "none"
+            return BuildNoSignalReading();
+        }
+
+        var powerOutput = GetOutputBand(
+            (anomaly.Mass + anomaly.Energy) / 2.0,
+            confidence,
+            random);
+        var motionOutput = GetOutputBand(
+            (anomaly.Speed + anomaly.Energy) / 2.0,
+            confidence,
+            random);
+
+        return confidence switch
+        {
+            < 0.54 =>
+                $"Weak anomaly reading. The trace hints at {powerOutput} mass or energy output and {motionOutput} motion or energy output, but the lock is too noisy for a firm profile.",
+            < 0.72 =>
+                $"Readable anomaly reading. Waveform shape suggests {powerOutput} mass or energy output. Phase behavior suggests {motionOutput} motion or energy output. Residual noise remains.",
+            < 0.9 =>
+                $"Clean anomaly reading. Stable return is consistent with {powerOutput} mass or energy output and {motionOutput} motion or energy output.",
+            _ =>
+                $"Locked anomaly reading. Strong coherent return indicates {powerOutput} mass or energy output with {motionOutput} motion or energy output."
+        };
+    }
+
+    private static string GetOutputBand(double value, double confidence, Random random)
+    {
+        if (confidence < 0.35)
+        {
+            return "unreadable";
+        }
+
+        var fuzzedValue = Clamp(
+            value + (SignedRandom(random) * (1 - confidence) * 42),
+            1,
+            100);
+        var band = fuzzedValue switch
+        {
+            < 34 => "low",
+            < 67 => "moderate",
+            _ => "high"
+        };
+
+        return confidence < 0.58
+            ? $"possible {band}"
+            : band;
+    }
+
+    private static string GetRecommendedFollowUp(double confidence)
+    {
+        return confidence < 0.35
+            ? "Retune filter and focus"
+            : "Spectral scan";
+    }
+
+    private static string GetConfidenceLabel(double confidence)
+    {
+        return confidence switch
+        {
+            >= 0.9 => EmScanConfidenceLabels.Locked,
+            >= 0.72 => EmScanConfidenceLabels.Clean,
+            >= 0.54 => EmScanConfidenceLabels.Readable,
+            >= 0.32 => EmScanConfidenceLabels.Weak,
+            _ => EmScanConfidenceLabels.Unstable
         };
     }
 
@@ -362,14 +442,19 @@ public sealed record EmScanner(
         };
     }
 
-    private static double RadiansToDegrees(double radians)
+    private static double SignedRandom(Random random)
     {
-        return radians * 180 / Math.PI;
+        return (random.NextDouble() * 2) - 1;
     }
 
-    private static double NormalizeDegrees(double degrees)
+    private static double NormalizeSignedPhase(double radians)
     {
-        return ((degrees % 360) + 360) % 360;
+        return Math.Atan2(Math.Sin(radians), Math.Cos(radians));
+    }
+
+    private static double Lerp(double start, double end, double amount)
+    {
+        return start + ((end - start) * amount);
     }
 
     private static double Clamp(double value, double minimum, double maximum)
@@ -391,11 +476,11 @@ public sealed record EmScanTarget(double X, double Y);
 public sealed record EmScanSignalProfile(
     uint NoiseSeed,
     double BaseStrength,
-    double NoiseLevel,
-    double FocusBias,
-    double FilterBias,
-    double PrimaryFrequency,
-    double DriftFrequency,
+    double BaseAmplitude,
+    double PrimaryWavelength,
+    double PhaseShiftRadians,
+    double IdealFilter,
+    double IdealFocus,
     string LockState);
 
 public sealed record EmScanReport(
@@ -404,16 +489,24 @@ public sealed record EmScanReport(
     long CapturedAtTick,
     EmScanTarget Target,
     double RadiusLightYears,
-    double SignalStrength,
-    double Coherence,
-    double DriftStability,
-    double? EstimatedSpeedKilometersPerSecond,
-    double? EstimatedAngleDegrees,
-    double? EstimatedDistortion,
+    double SignalConfidence,
+    double FilterScore,
+    double PhaseScore,
     string Confidence,
     string LockState,
     double Focus,
-    double Filter);
+    double Filter,
+    string ReadingSummary,
+    string RecommendedFollowUp);
+
+public static class EmScanConfidenceLabels
+{
+    public const string Unstable = "unstable";
+    public const string Weak = "weak";
+    public const string Readable = "readable";
+    public const string Clean = "clean";
+    public const string Locked = "locked";
+}
 
 public static class EmScanLockStates
 {

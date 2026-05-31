@@ -23,12 +23,13 @@ public sealed class GameHub(GameManager gameManager) : Hub<IGameClient>
         return gameManager.StartEmScanAsync(Context.ConnectionId, x, y);
     }
 
-    public Task CaptureEmScanReport(double focus, double filter)
+    public Task CaptureEmScanReport(double focus, double filter, double phaseErrorRadians)
     {
         return gameManager.CaptureEmScanReportAsync(
             Context.ConnectionId,
             focus,
-            filter);
+            filter,
+            phaseErrorRadians);
     }
 
     public Task StopEmScan()

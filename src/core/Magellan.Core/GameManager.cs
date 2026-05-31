@@ -112,6 +112,7 @@ public sealed class GameManager(
         string connectionId,
         double focus,
         double filter,
+        double phaseErrorRadians,
         CancellationToken cancellationToken = default)
     {
         if (!states.TryGetValue(connectionId, out var state) || state.Game is null)
@@ -132,7 +133,8 @@ public sealed class GameManager(
             tick,
             activeGame.World.JumpAreaMap,
             focus,
-            filter);
+            filter,
+            phaseErrorRadians);
         var nextShip = activeGame.Ship.WithScanners(
             activeGame.Ship.Scanners with
             {

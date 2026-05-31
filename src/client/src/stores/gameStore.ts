@@ -21,7 +21,11 @@ type GameStore = {
   startNewGame: () => Promise<void>
   startGravityScan: () => Promise<void>
   startEmScan: (x: number, y: number) => Promise<void>
-  captureEmScanReport: (focus: number, filter: number) => Promise<void>
+  captureEmScanReport: (
+    focus: number,
+    filter: number,
+    phaseErrorRadians: number,
+  ) => Promise<void>
   stopEmScan: () => Promise<void>
 }
 
@@ -142,9 +146,18 @@ export const useGameStore = create<GameStore>((set) => ({
     }
   },
 
-  captureEmScanReport: async (focus: number, filter: number) => {
+  captureEmScanReport: async (
+    focus: number,
+    filter: number,
+    phaseErrorRadians: number,
+  ) => {
     if (connection?.state === HubConnectionState.Connected) {
-      await connection.invoke('CaptureEmScanReport', focus, filter)
+      await connection.invoke(
+        'CaptureEmScanReport',
+        focus,
+        filter,
+        phaseErrorRadians,
+      )
     }
   },
 

@@ -100,21 +100,20 @@ export type EmScanLockState =
   | 'stable-lock'
 
 export type EmScanConfidence =
-  | 'none'
-  | 'low'
-  | 'low-medium'
-  | 'medium'
-  | 'high'
-  | 'absolute'
+  | 'unstable'
+  | 'weak'
+  | 'readable'
+  | 'clean'
+  | 'locked'
 
 export type EmScanSignalProfile = {
   noiseSeed: number
   baseStrength: number
-  noiseLevel: number
-  focusBias: number
-  filterBias: number
-  primaryFrequency: number
-  driftFrequency: number
+  baseAmplitude: number
+  primaryWavelength: number
+  phaseShiftRadians: number
+  idealFilter: number
+  idealFocus: number
   lockState: EmScanLockState
 }
 
@@ -133,16 +132,15 @@ export type EmScanReport = {
   capturedAtTick: number
   target: EmScanTarget
   radiusLightYears: number
-  signalStrength: number
-  coherence: number
-  driftStability: number
-  estimatedSpeedKilometersPerSecond: number | null
-  estimatedAngleDegrees: number | null
-  estimatedDistortion: number | null
+  signalConfidence: number
+  filterScore: number
+  phaseScore: number
   confidence: EmScanConfidence
   lockState: EmScanLockState
   focus: number
   filter: number
+  readingSummary: string
+  recommendedFollowUp: string
 }
 
 export type EmScanner = {
@@ -248,7 +246,6 @@ export type SensorAnomaly = {
   label: string
   x: number
   y: number
-  distance: number
 }
 
 export type JumpAreaMap = {

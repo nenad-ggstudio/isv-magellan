@@ -12,7 +12,11 @@ type NavigationProps = {
   elapsedMilliseconds: number
   emScanner: EmScanner
   gravityScanner: GravityScanner
-  onCaptureEmScanReport: (focus: number, filter: number) => Promise<void>
+  onCaptureEmScanReport: (
+    focus: number,
+    filter: number,
+    phaseErrorRadians: number,
+  ) => Promise<void>
   onStartEmScan: (x: number, y: number) => Promise<void>
   onStartGravityScan: () => Promise<void>
   onStopEmScan: () => Promise<void>

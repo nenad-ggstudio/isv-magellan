@@ -23,15 +23,6 @@ public sealed record GameWorld(
     private const int MinimumLocalAsteroidCount = 12;
     private const int MaximumLocalAsteroidCount = 18;
 
-    private const double AsteroidClusterMinimumSpeedKilometersPerSecond = 0.6;
-    private const double AsteroidClusterMaximumSpeedKilometersPerSecond = 1.2;
-    private const double RoguePlanetMinimumSpeedKilometersPerSecond = 0.1;
-    private const double RoguePlanetMaximumSpeedKilometersPerSecond = 0.3;
-    private const double CometMinimumSpeedKilometersPerSecond = 1.6;
-    private const double CometMaximumSpeedKilometersPerSecond = 6.4;
-    private const double EnergyParticleWellsMinimumSpeedKilometersPerSecond = 0.1;
-    private const double EnergyParticleWellsMaximumSpeedKilometersPerSecond = 0.2;
-
     private static readonly (string Kind, string Label)[] SensorAnomalyTypes =
     [
         (SensorAnomalyKinds.RoguePlanet, "Rogue Planet"),
@@ -168,7 +159,7 @@ public sealed record GameWorld(
         var distance = Math.Sqrt(random.NextDouble()) * JumpAreaRadiusLightYears;
         var angleRadians = random.NextDouble() * Math.Tau;
         var (Kind, Label) = SensorAnomalyTypes[random.Next(SensorAnomalyTypes.Length)];
-        var (Speed, Angle, Distortion) = GetAnomalyMovement(Kind, random);
+        var (Speed, Angle, Mass, Energy) = GetAnomalySignature(Kind, random);
 
         return new SensorAnomaly(
             $"jump-anomaly-{index:000}",
@@ -176,14 +167,14 @@ public sealed record GameWorld(
             Label,
             center + (Math.Cos(angleRadians) * distance),
             center + (Math.Sin(angleRadians) * distance),
-            distance,
             Speed,
             Angle,
-            Distortion
+            Mass,
+            Energy
         );
     }
 
-    private static (double Speed, double Angle, double Distortion) GetAnomalyMovement(
+    private static (int Speed, double Angle, int Mass, int Energy) GetAnomalySignature(
         string kind,
         Random random
     )
@@ -193,47 +184,44 @@ public sealed record GameWorld(
         {
             case SensorAnomalyKinds.AsteroidCluster:
             {
-                var speed = RandomDouble(
-                    random,
-                    AsteroidClusterMinimumSpeedKilometersPerSecond,
-                    AsteroidClusterMaximumSpeedKilometersPerSecond
-                );
-                var distortion = RandomDouble(random, 70, 85) / 100;
-                return (speed, angleRadians, distortion);
+                return (
+                    RandomInteger(random, 28, 56),
+                    angleRadians,
+                    RandomInteger(random, 44, 78),
+                    RandomInteger(random, 30, 62));
             }
             case SensorAnomalyKinds.Comet:
             {
-                var speed = RandomDouble(
-                    random,
-                    CometMinimumSpeedKilometersPerSecond,
-                    CometMaximumSpeedKilometersPerSecond
-                );
-                var distortion = RandomDouble(random, 30, 45) / 100;
-                return (speed, angleRadians, distortion);
+                return (
+                    RandomInteger(random, 62, 100),
+                    angleRadians,
+                    RandomInteger(random, 12, 42),
+                    RandomInteger(random, 50, 86));
             }
             case SensorAnomalyKinds.RoguePlanet:
             {
-                var speed = RandomDouble(
-                    random,
-                    RoguePlanetMinimumSpeedKilometersPerSecond,
-                    RoguePlanetMaximumSpeedKilometersPerSecond
-                );
-                var distortion = RandomDouble(random, 5, 15) / 100;
-                return (speed, angleRadians, distortion);
+                return (
+                    RandomInteger(random, 1, 24),
+                    angleRadians,
+                    RandomInteger(random, 72, 100),
+                    RandomInteger(random, 8, 35));
             }
             case SensorAnomalyKinds.EnergyParticleWells:
             {
-                var speed = RandomDouble(
-                    random,
-                    EnergyParticleWellsMinimumSpeedKilometersPerSecond,
-                    EnergyParticleWellsMaximumSpeedKilometersPerSecond
-                );
-                var distortion = RandomDouble(random, 90, 95) / 100;
-                return (speed, angleRadians, distortion);
+                return (
+                    RandomInteger(random, 10, 38),
+                    angleRadians,
+                    RandomInteger(random, 4, 30),
+                    RandomInteger(random, 78, 100));
             }
             default:
                 throw new NotSupportedException();
         }
+    }
+
+    private static int RandomInteger(Random random, int minimum, int maximum)
+    {
+        return random.Next(minimum, maximum + 1);
     }
 
     private static int GetJumpAreaSeed(WorldPosition shipPosition, DateTimeOffset currentTime)
