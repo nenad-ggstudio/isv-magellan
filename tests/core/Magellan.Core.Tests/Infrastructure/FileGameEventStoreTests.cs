@@ -77,6 +77,31 @@ public sealed class FileGameEventStoreTests
     }
 
     [Fact]
+    public async Task AppendAsync_does_not_persist_non_persisted_events()
+    {
+        using var workspace = TestWorkspace.Create();
+
+        using (var store = CreateStore(workspace))
+        {
+            await store.AppendAsync(
+                new ClientGameStateChangedGameEvent(
+                    "connection-1",
+                    GameState.Bootstrap()));
+
+            var replayed = await ReadSingle(store);
+
+            Assert.IsType<ClientGameStateChangedGameEvent>(replayed.Event);
+        }
+
+        Assert.False(File.Exists(workspace.GameEventsPath));
+
+        using var reloadedStore = CreateStore(workspace);
+        var replayedEvents = await ReadAll(reloadedStore);
+
+        Assert.Empty(replayedEvents);
+    }
+
+    [Fact]
     public async Task AppendAsync_rehydrates_game_state_changed_events()
     {
         using var workspace = TestWorkspace.Create();
@@ -183,6 +208,18 @@ public sealed class FileGameEventStoreTests
         }
 
         throw new InvalidOperationException("The event store did not return an event.");
+    }
+
+    private static async Task<IReadOnlyList<GameEventEnvelope>> ReadAll(IGameEventStore store)
+    {
+        var events = new List<GameEventEnvelope>();
+
+        await foreach (var envelope in store.ReadAsync())
+        {
+            events.Add(envelope);
+        }
+
+        return events;
     }
 
     public sealed record TestGameEvent(Guid GameId, string Name) : GameEvent(GameId);

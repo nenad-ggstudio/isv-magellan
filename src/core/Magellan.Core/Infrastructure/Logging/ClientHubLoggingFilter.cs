@@ -13,7 +13,7 @@ public sealed class ClientHubLoggingFilter(ILogger<ClientHubLoggingFilter> logge
         var connectionId = invocationContext.Context.ConnectionId;
         var methodName = invocationContext.HubMethodName;
 
-        logger.LogInformation(
+        logger.LogDebug(
             "Client hub request {HubMethod} started for connection {ConnectionId} with {ArgumentCount} arguments.",
             methodName,
             connectionId,
@@ -24,7 +24,7 @@ public sealed class ClientHubLoggingFilter(ILogger<ClientHubLoggingFilter> logge
             var result = await next(invocationContext);
             var elapsed = Stopwatch.GetElapsedTime(startedAt);
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Client hub request {HubMethod} completed for connection {ConnectionId} in {ElapsedMilliseconds} ms.",
                 methodName,
                 connectionId,
@@ -51,7 +51,7 @@ public sealed class ClientHubLoggingFilter(ILogger<ClientHubLoggingFilter> logge
         HubLifetimeContext context,
         Func<HubLifetimeContext, Task> next)
     {
-        logger.LogInformation(
+        logger.LogDebug(
             "Client hub connection started for connection {ConnectionId}.",
             context.Context.ConnectionId);
 
@@ -65,7 +65,7 @@ public sealed class ClientHubLoggingFilter(ILogger<ClientHubLoggingFilter> logge
     {
         if (exception is null)
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Client hub connection ended for connection {ConnectionId}.",
                 context.Context.ConnectionId);
         }

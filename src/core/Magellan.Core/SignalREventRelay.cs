@@ -29,22 +29,49 @@ public sealed class SignalREventRelay(
     {
         try
         {
-            if (envelope.Event is GameStateChangedGameEvent stateChanged)
+            if (envelope.Event is GameStartedGameEvent gameStarted)
             {
-                var state = ClientGameStateProjection.ForClient(stateChanged.State);
-
-                foreach (var connectionId in gameManager.GetConnectionIds(stateChanged.GameId))
-                {
-                    await gameHub.Clients
-                        .Client(connectionId)
-                        .GameStateChanged(state);
-                }
+                await PublishGameState(gameStarted.GameId);
+            }
+            else if (envelope.Event is GameStateChangedGameEvent stateChanged)
+            {
+                await PublishGameState(stateChanged.GameId, stateChanged.State);
             }
             else if (envelope.Event is ClientGameStateChangedGameEvent clientStateChanged)
             {
                 await gameHub.Clients
                     .Client(clientStateChanged.ConnectionId)
                     .GameStateChanged(ClientGameStateProjection.ForClient(clientStateChanged.State));
+            }
+            else if (envelope.Event is GravityScannerChangedGameEvent gravityScannerChanged)
+            {
+                foreach (var connectionId in gameManager.GetConnectionIds(
+                    gravityScannerChanged.GameId))
+                {
+                    await gameHub.Clients
+                        .Client(connectionId)
+                        .GravityScannerChanged(gravityScannerChanged.GravityScanner);
+                }
+            }
+            else if (envelope.Event is EmScannerChangedGameEvent emScannerChanged)
+            {
+                foreach (var connectionId in gameManager.GetConnectionIds(
+                    emScannerChanged.GameId))
+                {
+                    await gameHub.Clients
+                        .Client(connectionId)
+                        .EmScannerChanged(emScannerChanged.EmScanner);
+                }
+            }
+            else if (envelope.Event is EmScanPowerDrainedGameEvent powerDrained)
+            {
+                foreach (var connectionId in gameManager.GetConnectionIds(powerDrained.GameId))
+                {
+                    var client = gameHub.Clients.Client(connectionId);
+
+                    await client.BatteryBankChanged(powerDrained.BatteryBank);
+                    await client.EmScannerChanged(powerDrained.EmScanner);
+                }
             }
             else if (envelope.Event is TickGameEvent gameTick)
             {
@@ -61,6 +88,26 @@ public sealed class SignalREventRelay(
                 "Unable to publish game event {Sequence} for game {GameId}.",
                 envelope.Sequence,
                 envelope.Event.GameId);
+        }
+    }
+
+    private async Task PublishGameState(Guid gameId, GameState? state = null)
+    {
+        if (state is null)
+        {
+            if (!gameManager.TryGetClientState(gameId, out state) || state is null)
+            {
+                return;
+            }
+        }
+
+        var clientState = ClientGameStateProjection.ForClient(state);
+
+        foreach (var connectionId in gameManager.GetConnectionIds(gameId))
+        {
+            await gameHub.Clients
+                .Client(connectionId)
+                .GameStateChanged(clientState);
         }
     }
 }

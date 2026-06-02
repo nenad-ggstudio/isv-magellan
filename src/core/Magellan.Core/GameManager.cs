@@ -44,7 +44,10 @@ public sealed class GameManager(
         ReplaceCurrentGame(gameId, state, connectionId);
         gameEngine.StartNewGame(gameId, startedAt);
 
-        await PublishStateChanged(gameId, state, cancellationToken);
+        await PublishGameEvent(
+            new GameStartedGameEvent(gameId, startedAt),
+            "Game started.",
+            cancellationToken);
     }
 
     public async Task StartGravityScanAsync(
@@ -81,7 +84,10 @@ public sealed class GameManager(
         };
 
         states[gameId] = nextState;
-        await PublishStateChanged(gameId, nextState, cancellationToken);
+        await PublishGameEvent(
+            new GravityScannerChangedGameEvent(gameId, nextScanner),
+            "Gravity scanner changed.",
+            cancellationToken);
     }
 
     public async Task StartEmScanAsync(
@@ -124,7 +130,10 @@ public sealed class GameManager(
         };
 
         states[gameId] = nextState;
-        await PublishStateChanged(gameId, nextState, cancellationToken);
+        await PublishGameEvent(
+            new EmScannerChangedGameEvent(gameId, nextScanner),
+            "EM scanner changed.",
+            cancellationToken);
     }
 
     public async Task CaptureEmScanReportAsync(
@@ -169,7 +178,10 @@ public sealed class GameManager(
         };
 
         states[gameId] = nextState;
-        await PublishStateChanged(gameId, nextState, cancellationToken);
+        await PublishGameEvent(
+            new EmScannerChangedGameEvent(gameId, nextScanner),
+            "EM scanner changed.",
+            cancellationToken);
     }
 
     public async Task StopEmScanAsync(
@@ -190,10 +202,11 @@ public sealed class GameManager(
             return;
         }
 
+        var nextScanner = scanner.StopScan();
         var nextShip = activeGame.Ship.WithScanners(
             activeGame.Ship.Scanners with
             {
-                EmScanner = scanner.StopScan()
+                EmScanner = nextScanner
             });
         var nextState = state with
         {
@@ -204,7 +217,10 @@ public sealed class GameManager(
         };
 
         states[gameId] = nextState;
-        await PublishStateChanged(gameId, nextState, cancellationToken);
+        await PublishGameEvent(
+            new EmScannerChangedGameEvent(gameId, nextScanner),
+            "EM scanner changed.",
+            cancellationToken);
     }
 
     public async Task ApplyTickAsync(
@@ -259,7 +275,10 @@ public sealed class GameManager(
         };
 
         states[gameId] = nextState;
-        await PublishStateChanged(gameId, nextState, cancellationToken);
+        await PublishGameEvent(
+            new EmScanPowerDrainedGameEvent(gameId, nextBattery, nextScanner),
+            "EM scan power drained.",
+            cancellationToken);
     }
 
     public void Disconnect(string connectionId)
@@ -272,6 +291,11 @@ public sealed class GameManager(
         return gameConnections.TryGetValue(gameId, out var connections)
             ? connections.Keys.ToArray()
             : [];
+    }
+
+    public bool TryGetClientState(Guid gameId, out GameState? state)
+    {
+        return states.TryGetValue(gameId, out state);
     }
 
     private bool TryGetGameForConnection(
@@ -390,19 +414,18 @@ public sealed class GameManager(
         return connectionIds;
     }
 
-    private async Task PublishStateChanged(
-        Guid gameId,
-        GameState state,
+    private async Task PublishGameEvent(
+        GameEvent gameEvent,
+        string message,
         CancellationToken cancellationToken)
     {
-        var envelope = await gameEventBus.PublishAsync(
-            new GameStateChangedGameEvent(gameId, state),
-            cancellationToken);
+        var envelope = await gameEventBus.PublishAsync(gameEvent, cancellationToken);
 
-        logger.LogInformation(
-            "Game state changed for game {GameId}: {Screen} (Sequence: {Sequence}).",
-            gameId,
-            state.Screen,
+        logger.LogDebug(
+            "{Message} GameId: {GameId}, Event: {EventType}, Sequence: {Sequence}.",
+            message,
+            gameEvent.GameId,
+            gameEvent.GetType().Name,
             envelope.Sequence);
     }
 
@@ -415,7 +438,7 @@ public sealed class GameManager(
             new ClientGameStateChangedGameEvent(connectionId, state),
             cancellationToken);
 
-        logger.LogInformation(
+        logger.LogDebug(
             "Client game state snapshot for connection {ConnectionId}: {Screen} (GameId: {GameId}, Sequence: {Sequence}).",
             connectionId,
             state.Screen,

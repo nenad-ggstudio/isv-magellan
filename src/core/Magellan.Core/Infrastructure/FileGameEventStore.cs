@@ -69,6 +69,10 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
             {
                 await AppendTickEvent(envelope, tickGameEvent, cancellationToken);
             }
+            else if (gameEvent is INonPersistedGameEvent)
+            {
+                // Client-only snapshots are replayable only for active subscribers.
+            }
             else
             {
                 await AppendGameEvent(envelope, cancellationToken);

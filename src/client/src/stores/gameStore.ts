@@ -5,7 +5,14 @@ import {
   type HubConnection,
 } from '@microsoft/signalr'
 import { create } from 'zustand'
-import type { GameState, GameTick } from '../gameTypes'
+import type {
+  ActiveGameState,
+  BatteryBank,
+  EmScanner,
+  GameState,
+  GameTick,
+  GravityScanner,
+} from '../gameTypes'
 
 const initialTick: GameTick = {
   elapsedMilliseconds: 0,
@@ -75,6 +82,54 @@ export const useGameStore = create<GameStore>((set) => ({
       }
 
       set({ tick: nextTick })
+    })
+    nextConnection.on('BatteryBankChanged', (nextBatteryBank: BatteryBank) => {
+      if (connection !== nextConnection) {
+        return
+      }
+
+      updateActiveGame(set, (game) => ({
+        ...game,
+        ship: {
+          ...game.ship,
+          batteryBank: nextBatteryBank,
+        },
+      }))
+    })
+    nextConnection.on(
+      'GravityScannerChanged',
+      (nextGravityScanner: GravityScanner) => {
+        if (connection !== nextConnection) {
+          return
+        }
+
+        updateActiveGame(set, (game) => ({
+          ...game,
+          ship: {
+            ...game.ship,
+            scanners: {
+              ...game.ship.scanners,
+              gravityScanner: nextGravityScanner,
+            },
+          },
+        }))
+      },
+    )
+    nextConnection.on('EmScannerChanged', (nextEmScanner: EmScanner) => {
+      if (connection !== nextConnection) {
+        return
+      }
+
+      updateActiveGame(set, (game) => ({
+        ...game,
+        ship: {
+          ...game.ship,
+          scanners: {
+            ...game.ship.scanners,
+            emScanner: nextEmScanner,
+          },
+        },
+      }))
     })
     nextConnection.onreconnecting(() => {
       if (connection !== nextConnection) {
@@ -175,4 +230,26 @@ async function getGameState(currentConnection: HubConnection) {
   ) {
     await currentConnection.invoke('GetGameState')
   }
+}
+
+function updateActiveGame(
+  set: (
+    partial:
+      | Partial<GameStore>
+      | ((state: GameStore) => Partial<GameStore>),
+  ) => void,
+  update: (game: ActiveGameState) => ActiveGameState,
+) {
+  set((state) => {
+    if (state.gameState?.screen !== 'game' || !state.gameState.game) {
+      return {}
+    }
+
+    return {
+      gameState: {
+        ...state.gameState,
+        game: update(state.gameState.game),
+      },
+    }
+  })
 }
