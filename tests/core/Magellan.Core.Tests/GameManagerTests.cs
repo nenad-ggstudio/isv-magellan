@@ -256,10 +256,12 @@ public sealed class GameManagerTests
         await manager.StartGravityScanAsync("connection-1");
 
         var events = await ReadAll(store);
-        var scanEvent = Assert.IsType<GravityScannerChangedGameEvent>(events.Last().Event);
-        var scanner = scanEvent.GravityScanner;
+        var scanEvent = Assert.IsType<GravityScanStartedGameEvent>(events.Last().Event);
+        var state = ReadRequiredState(manager, scanEvent.GameId);
+        var scanner = state.Game!.Ship.Scanners.GravityScanner;
         var currentScan = scanner.CurrentScan;
 
+        Assert.Equal(0, scanEvent.StartedAtTick);
         Assert.NotNull(currentScan);
         Assert.Equal(0, currentScan!.StartedAtTick);
         Assert.Equal(40, currentScan.CompletesAtTick);
@@ -308,10 +310,14 @@ public sealed class GameManagerTests
         await manager.StartEmScanAsync("connection-1", -0.5, 3.4);
 
         var events = await ReadAll(store);
-        var scanEvent = Assert.IsType<EmScannerChangedGameEvent>(events.Last().Event);
-        var scanner = scanEvent.EmScanner;
+        var scanEvent = Assert.IsType<EmScanStartedGameEvent>(events.Last().Event);
+        var state = ReadRequiredState(manager, scanEvent.GameId);
+        var scanner = state.Game!.Ship.Scanners.EmScanner;
         var currentScan = scanner.CurrentScan;
 
+        Assert.Equal(0, scanEvent.StartedAtTick);
+        Assert.Equal(-0.5, scanEvent.TargetX);
+        Assert.Equal(3.4, scanEvent.TargetY);
         Assert.NotNull(currentScan);
         Assert.StartsWith("em-scan-", currentScan!.Id);
         Assert.Equal(0, currentScan.StartedAtTick);
@@ -354,8 +360,9 @@ public sealed class GameManagerTests
         await manager.StopEmScanAsync("connection-1");
 
         var events = await ReadAll(store);
-        var scanEvent = Assert.IsType<EmScannerChangedGameEvent>(events.Last().Event);
-        var scanner = scanEvent.EmScanner;
+        var scanEvent = Assert.IsType<EmScanStoppedGameEvent>(events.Last().Event);
+        var state = ReadRequiredState(manager, scanEvent.GameId);
+        var scanner = state.Game!.Ship.Scanners.EmScanner;
 
         Assert.Null(scanner.CurrentScan);
         Assert.Equal(3, events.Count);
@@ -378,9 +385,11 @@ public sealed class GameManagerTests
             0);
 
         var events = await ReadAll(store);
-        var reportEvent = Assert.IsType<EmScannerChangedGameEvent>(events.Last().Event);
-        var report = Assert.Single(reportEvent.EmScanner.Reports);
+        var reportEvent = Assert.IsType<EmScanReportCapturedGameEvent>(events.Last().Event);
+        var reportState = ReadRequiredState(manager, reportEvent.GameId);
+        var report = Assert.Single(reportState.Game!.Ship.Scanners.EmScanner.Reports);
 
+        Assert.Equal(0, reportEvent.PhaseErrorRadians);
         Assert.StartsWith("em-scan-", report.SourceScanId);
         Assert.Equal(anomaly.X, report.Target.X, precision: 3);
         Assert.Equal(anomaly.Y, report.Target.Y, precision: 3);
@@ -411,9 +420,12 @@ public sealed class GameManagerTests
         await manager.CaptureEmScanReportAsync("connection-1", 50, 50, 0);
 
         var events = await ReadAll(store);
-        var reportEvent = Assert.IsType<EmScannerChangedGameEvent>(events.Last().Event);
-        var report = Assert.Single(reportEvent.EmScanner.Reports);
+        var reportEvent = Assert.IsType<EmScanReportCapturedGameEvent>(events.Last().Event);
+        var reportState = ReadRequiredState(manager, reportEvent.GameId);
+        var report = Assert.Single(reportState.Game!.Ship.Scanners.EmScanner.Reports);
 
+        Assert.Equal(50, reportEvent.Focus);
+        Assert.Equal(50, reportEvent.Filter);
         Assert.Equal(EmScanConfidenceLabels.Unstable, report.Confidence);
         Assert.Equal(EmScanLockStates.NoSignal, report.LockState);
         Assert.Equal(0, report.SignalConfidence);
@@ -435,11 +447,17 @@ public sealed class GameManagerTests
 
         var events = await ReadAll(store);
         var tickEvent = Assert.IsType<EmScanPowerDrainedGameEvent>(events.Last().Event);
+        var state = ReadRequiredState(manager, tickEvent.GameId);
 
-        Assert.Equal(0.739, tickEvent.BatteryBank.ChargeLevel, precision: 3);
+        Assert.Equal(10, tickEvent.Tick);
+        Assert.Equal(1, tickEvent.DrainIntervals);
+        Assert.Equal(0.001, tickEvent.ChargeLevelCost, precision: 3);
+        Assert.Equal(10, tickEvent.LastPowerDrainedAtTick);
+        Assert.False(tickEvent.ScanStopped);
+        Assert.Equal(0.739, state.Game!.Ship.BatteryBank.ChargeLevel, precision: 3);
         Assert.Equal(
             10,
-            tickEvent.EmScanner.CurrentScan?.LastPowerDrainedAtTick);
+            state.Game.Ship.Scanners.EmScanner.CurrentScan?.LastPowerDrainedAtTick);
     }
 
     [Fact]
@@ -468,11 +486,17 @@ public sealed class GameManagerTests
 
         var events = await ReadAll(store);
         var tickEvent = Assert.IsType<EmScanPowerDrainedGameEvent>(events.Last().Event);
+        var state = ReadRequiredState(manager, tickEvent.GameId);
 
-        Assert.Equal(0.737, tickEvent.BatteryBank.ChargeLevel, precision: 3);
+        Assert.Equal(30, tickEvent.Tick);
+        Assert.Equal(3, tickEvent.DrainIntervals);
+        Assert.Equal(0.003, tickEvent.ChargeLevelCost, precision: 3);
+        Assert.Equal(30, tickEvent.LastPowerDrainedAtTick);
+        Assert.False(tickEvent.ScanStopped);
+        Assert.Equal(0.737, state.Game!.Ship.BatteryBank.ChargeLevel, precision: 3);
         Assert.Equal(
             30,
-            tickEvent.EmScanner.CurrentScan?.LastPowerDrainedAtTick);
+            state.Game.Ship.Scanners.EmScanner.CurrentScan?.LastPowerDrainedAtTick);
     }
 
     [Fact]
@@ -487,9 +511,11 @@ public sealed class GameManagerTests
 
         var events = await ReadAll(store);
         var tickEvent = Assert.IsType<EmScanPowerDrainedGameEvent>(events.Last().Event);
+        var state = ReadRequiredState(manager, tickEvent.GameId);
 
-        Assert.Equal(0, tickEvent.BatteryBank.ChargeLevel);
-        Assert.Null(tickEvent.EmScanner.CurrentScan);
+        Assert.True(tickEvent.ScanStopped);
+        Assert.Equal(0, state.Game!.Ship.BatteryBank.ChargeLevel);
+        Assert.Null(state.Game.Ship.Scanners.EmScanner.CurrentScan);
     }
 
     [Fact]
@@ -566,6 +592,13 @@ public sealed class GameManagerTests
         Assert.True(manager.TryGetClientState(newGameEvent.GameId, out var state));
 
         return (newGameEvent.GameId, state!);
+    }
+
+    private static GameState ReadRequiredState(GameManager manager, Guid gameId)
+    {
+        Assert.True(manager.TryGetClientState(gameId, out var state));
+
+        return state!;
     }
 
     private static (double X, double Y) FindQuietPoint(

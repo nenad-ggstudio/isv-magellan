@@ -39,13 +39,14 @@ public sealed class GameManager(
     {
         var gameId = Guid.NewGuid();
         var startedAt = DateTimeOffset.UtcNow;
-        var state = GameState.NewGame(gameId, startedAt);
+        var gameEvent = new GameStartedGameEvent(gameId, startedAt);
+        var state = GameStateReducer.Apply(null, gameEvent);
 
         ReplaceCurrentGame(gameId, state, connectionId);
         gameEngine.StartNewGame(gameId, startedAt);
 
         await PublishGameEvent(
-            new GameStartedGameEvent(gameId, startedAt),
+            gameEvent,
             "Game started.",
             cancellationToken);
     }
@@ -69,24 +70,10 @@ public sealed class GameManager(
             return;
         }
 
-        var nextScanner = scanner.StartScan(tick, activeGame.World.JumpAreaMap);
-        var nextShip = activeGame.Ship.WithScanners(
-            activeGame.Ship.Scanners with
-            {
-                GravityScanner = nextScanner
-            });
-        var nextState = state with
-        {
-            Game = activeGame with
-            {
-                Ship = nextShip
-            }
-        };
-
-        states[gameId] = nextState;
-        await PublishGameEvent(
-            new GravityScannerChangedGameEvent(gameId, nextScanner),
-            "Gravity scanner changed.",
+        await ApplyAndPublishGameEvent(
+            state,
+            new GravityScanStartedGameEvent(gameId, tick),
+            "Gravity scan started.",
             cancellationToken);
     }
 
@@ -111,28 +98,10 @@ public sealed class GameManager(
         }
 
         var tick = gameEngine.GetCurrentTick(gameId);
-        var nextScanner = scanner.StartScan(
-            tick,
-            targetX,
-            targetY,
-            activeGame.World.JumpAreaMap);
-        var nextShip = activeGame.Ship.WithScanners(
-            activeGame.Ship.Scanners with
-            {
-                EmScanner = nextScanner
-            });
-        var nextState = state with
-        {
-            Game = activeGame with
-            {
-                Ship = nextShip
-            }
-        };
-
-        states[gameId] = nextState;
-        await PublishGameEvent(
-            new EmScannerChangedGameEvent(gameId, nextScanner),
-            "EM scanner changed.",
+        await ApplyAndPublishGameEvent(
+            state,
+            new EmScanStartedGameEvent(gameId, tick, targetX, targetY),
+            "EM scan started.",
             cancellationToken);
     }
 
@@ -158,29 +127,15 @@ public sealed class GameManager(
         }
 
         var tick = gameEngine.GetCurrentTick(gameId);
-        var nextScanner = scanner.CaptureReport(
-            tick,
-            activeGame.World.JumpAreaMap,
-            focus,
-            filter,
-            phaseErrorRadians);
-        var nextShip = activeGame.Ship.WithScanners(
-            activeGame.Ship.Scanners with
-            {
-                EmScanner = nextScanner
-            });
-        var nextState = state with
-        {
-            Game = activeGame with
-            {
-                Ship = nextShip
-            }
-        };
-
-        states[gameId] = nextState;
-        await PublishGameEvent(
-            new EmScannerChangedGameEvent(gameId, nextScanner),
-            "EM scanner changed.",
+        await ApplyAndPublishGameEvent(
+            state,
+            new EmScanReportCapturedGameEvent(
+                gameId,
+                tick,
+                focus,
+                filter,
+                phaseErrorRadians),
+            "EM scan report captured.",
             cancellationToken);
     }
 
@@ -202,24 +157,10 @@ public sealed class GameManager(
             return;
         }
 
-        var nextScanner = scanner.StopScan();
-        var nextShip = activeGame.Ship.WithScanners(
-            activeGame.Ship.Scanners with
-            {
-                EmScanner = nextScanner
-            });
-        var nextState = state with
-        {
-            Game = activeGame with
-            {
-                Ship = nextShip
-            }
-        };
-
-        states[gameId] = nextState;
-        await PublishGameEvent(
-            new EmScannerChangedGameEvent(gameId, nextScanner),
-            "EM scanner changed.",
+        await ApplyAndPublishGameEvent(
+            state,
+            new EmScanStoppedGameEvent(gameId),
+            "EM scan stopped.",
             cancellationToken);
     }
 
@@ -253,30 +194,18 @@ public sealed class GameManager(
 
         var requestedChargeCost = elapsedDrainIntervals * EmScanner.PowerDrainChargeLevel;
         var currentBattery = activeGame.Ship.BatteryBank;
-        var nextBattery = currentBattery.DrainChargeLevel(requestedChargeCost);
-        var nextScanner = currentBattery.ChargeLevel <= requestedChargeCost
-            ? scanner.StopScan()
-            : scanner.WithPowerDrainCheckpoint(
-                currentScan.LastPowerDrainedAtTick
-                + (elapsedDrainIntervals * EmScanner.PowerDrainIntervalTicks));
-        var nextShip = activeGame.Ship
-            .WithBatteryBank(nextBattery)
-            .WithScanners(
-                activeGame.Ship.Scanners with
-                {
-                    EmScanner = nextScanner
-                });
-        var nextState = state with
-        {
-            Game = activeGame with
-            {
-                Ship = nextShip
-            }
-        };
+        var lastPowerDrainedAtTick = currentScan.LastPowerDrainedAtTick
+            + (elapsedDrainIntervals * EmScanner.PowerDrainIntervalTicks);
 
-        states[gameId] = nextState;
-        await PublishGameEvent(
-            new EmScanPowerDrainedGameEvent(gameId, nextBattery, nextScanner),
+        await ApplyAndPublishGameEvent(
+            state,
+            new EmScanPowerDrainedGameEvent(
+                gameId,
+                tick.Tick,
+                elapsedDrainIntervals,
+                requestedChargeCost,
+                lastPowerDrainedAtTick,
+                currentBattery.ChargeLevel <= requestedChargeCost),
             "EM scan power drained.",
             cancellationToken);
     }
@@ -412,6 +341,17 @@ public sealed class GameManager(
         }
 
         return connectionIds;
+    }
+
+    private async Task ApplyAndPublishGameEvent(
+        GameState state,
+        GameEvent gameEvent,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        states[gameEvent.GameId] = GameStateReducer.Apply(state, gameEvent);
+
+        await PublishGameEvent(gameEvent, message, cancellationToken);
     }
 
     private async Task PublishGameEvent(

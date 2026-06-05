@@ -43,35 +43,26 @@ public sealed class SignalREventRelay(
                     .Client(clientStateChanged.ConnectionId)
                     .GameStateChanged(ClientGameStateProjection.ForClient(clientStateChanged.State));
             }
-            else if (envelope.Event is GravityScannerChangedGameEvent gravityScannerChanged)
+            else if (envelope.Event is GravityScanStartedGameEvent gravityScanStarted)
             {
-                foreach (var connectionId in gameManager.GetConnectionIds(
-                    gravityScannerChanged.GameId))
-                {
-                    await gameHub.Clients
-                        .Client(connectionId)
-                        .GravityScannerChanged(gravityScannerChanged.GravityScanner);
-                }
+                await PublishGravityScanner(gravityScanStarted.GameId);
             }
-            else if (envelope.Event is EmScannerChangedGameEvent emScannerChanged)
+            else if (envelope.Event is EmScanStartedGameEvent emScanStarted)
             {
-                foreach (var connectionId in gameManager.GetConnectionIds(
-                    emScannerChanged.GameId))
-                {
-                    await gameHub.Clients
-                        .Client(connectionId)
-                        .EmScannerChanged(emScannerChanged.EmScanner);
-                }
+                await PublishEmScanner(emScanStarted.GameId);
+            }
+            else if (envelope.Event is EmScanReportCapturedGameEvent reportCaptured)
+            {
+                await PublishEmScanner(reportCaptured.GameId);
+            }
+            else if (envelope.Event is EmScanStoppedGameEvent emScanStopped)
+            {
+                await PublishEmScanner(emScanStopped.GameId);
             }
             else if (envelope.Event is EmScanPowerDrainedGameEvent powerDrained)
             {
-                foreach (var connectionId in gameManager.GetConnectionIds(powerDrained.GameId))
-                {
-                    var client = gameHub.Clients.Client(connectionId);
-
-                    await client.BatteryBankChanged(powerDrained.BatteryBank);
-                    await client.EmScannerChanged(powerDrained.EmScanner);
-                }
+                await PublishBatteryBank(powerDrained.GameId);
+                await PublishEmScanner(powerDrained.GameId);
             }
             else if (envelope.Event is TickGameEvent gameTick)
             {
@@ -88,6 +79,51 @@ public sealed class SignalREventRelay(
                 "Unable to publish game event {Sequence} for game {GameId}.",
                 envelope.Sequence,
                 envelope.Event.GameId);
+        }
+    }
+
+    private async Task PublishBatteryBank(Guid gameId)
+    {
+        if (!TryGetActiveGame(gameId, out var activeGame))
+        {
+            return;
+        }
+
+        foreach (var connectionId in gameManager.GetConnectionIds(gameId))
+        {
+            await gameHub.Clients
+                .Client(connectionId)
+                .BatteryBankChanged(activeGame.Ship.BatteryBank);
+        }
+    }
+
+    private async Task PublishGravityScanner(Guid gameId)
+    {
+        if (!TryGetActiveGame(gameId, out var activeGame))
+        {
+            return;
+        }
+
+        foreach (var connectionId in gameManager.GetConnectionIds(gameId))
+        {
+            await gameHub.Clients
+                .Client(connectionId)
+                .GravityScannerChanged(activeGame.Ship.Scanners.GravityScanner);
+        }
+    }
+
+    private async Task PublishEmScanner(Guid gameId)
+    {
+        if (!TryGetActiveGame(gameId, out var activeGame))
+        {
+            return;
+        }
+
+        foreach (var connectionId in gameManager.GetConnectionIds(gameId))
+        {
+            await gameHub.Clients
+                .Client(connectionId)
+                .EmScannerChanged(activeGame.Ship.Scanners.EmScanner);
         }
     }
 
@@ -109,5 +145,17 @@ public sealed class SignalREventRelay(
                 .Client(connectionId)
                 .GameStateChanged(clientState);
         }
+    }
+
+    private bool TryGetActiveGame(Guid gameId, out ActiveGameState activeGame)
+    {
+        if (gameManager.TryGetClientState(gameId, out var state) && state?.Game is not null)
+        {
+            activeGame = state.Game;
+            return true;
+        }
+
+        activeGame = null!;
+        return false;
     }
 }
