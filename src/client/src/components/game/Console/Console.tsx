@@ -15,13 +15,17 @@ export function Console({ tick }: ConsoleProps) {
       aria-label="Game console"
     >
       <div>
-        <span className={panelLabel}>Log</span>
+        <span className={panelLabel}>SYS.LOG</span>
         <h2 className={panelHeading}>Console</h2>
       </div>
-      <div className="min-h-0 overflow-hidden rounded-md border border-[#243033] bg-[#020405] p-3.5 font-mono text-[13px] leading-normal text-[#84cdb8]">
-        <p className="m-0 mb-1">&gt; Game engine link pending commands.</p>
-        <p className="m-0 mb-1">&gt; Worker tick received: {tick || '--'}.</p>
-        <p className="m-0 mb-1">&gt; Awaiting sector events.</p>
+      <div className="sci-corners-on relative min-h-0 overflow-hidden rounded border border-[#142840] bg-[#010306] p-3.5 text-[13px] leading-normal text-[#00e87c]">
+        <div className="sci-scanlines pointer-events-none absolute inset-0 opacity-50" />
+        <div className="relative">
+          <p className="m-0 mb-1 opacity-50">&gt; Game engine link pending commands.</p>
+          <p className="m-0 mb-1 opacity-70">&gt; Worker tick received: {tick || '--'}.</p>
+          <p className="m-0 mb-2 opacity-80">&gt; Awaiting sector events.</p>
+          <p className="terminal-cursor m-0">&gt;</p>
+        </div>
       </div>
     </section>
   )

@@ -52,29 +52,29 @@ export function ShipStatus({ ship }: ShipStatusProps) {
           </div>
         ))}
       </dl>
-      <details className="group grid gap-2.5 rounded-md border border-[#243033] bg-[rgb(3_6_7_/_62%)] p-0">
-        <summary className="flex min-h-[42px] cursor-pointer list-none items-center justify-between gap-3 px-3 font-[650] text-[#f2f7f6] [&::-webkit-details-marker]:hidden">
+      <details className="group grid gap-2.5 rounded border border-[#142840] bg-[rgb(3_8_14_/_60%)] p-0">
+        <summary className="flex min-h-[42px] cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-medium uppercase tracking-[0.1em] text-[#6a9aac] [&::-webkit-details-marker]:hidden hover:text-[#b4d4e4] transition-colors">
           <span>Cargo Hold</span>
           <span className="flex items-center gap-2">
-            <strong className="text-[11px] font-[650] uppercase text-[#91aaaa]">
+            <strong className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#3a5c6e] tabular-nums">
               {occupiedUnits}/{ship.storageUnits.length} units
             </strong>
-            <span className="text-base leading-none text-[#7f999a] group-open:hidden">
+            <span className="text-sm leading-none text-[#3a5c6e] group-open:hidden">
               +
             </span>
-            <span className="hidden text-base leading-none text-[#7f999a] group-open:inline">
-              -
+            <span className="hidden text-sm leading-none text-[#3a5c6e] group-open:inline">
+              −
             </span>
           </span>
         </summary>
-        <div className="flex justify-between gap-3 border-t border-[#1d282a] px-3 pt-[11px]">
-          <span className="text-[10px] uppercase text-[#7f999a]">Stored</span>
-          <strong className="text-[#dce7e5]">
+        <div className="flex justify-between gap-3 border-t border-[#0c1c2c] px-3 pt-[11px]">
+          <span className="text-[10px] uppercase tracking-[0.14em] text-[#3a5c6e]">Stored</span>
+          <strong className="text-[11px] tabular-nums text-[#c8dfe8]">
             {formatKilograms(storedKilograms)} /{' '}
             {formatKilograms(totalCapacityKilograms)}
           </strong>
         </div>
-        <ol className="m-0 grid max-h-[440px] list-none gap-2 overflow-auto px-3 pb-3">
+        <ol className="m-0 grid max-h-[440px] list-none gap-2 overflow-auto px-3 pb-3 [scrollbar-color:#1e3c58_transparent] [scrollbar-width:thin]">
           {ship.storageUnits.map((unit) => (
             <StorageUnitRow key={unit.slotNumber} unit={unit} />
           ))}
@@ -91,23 +91,23 @@ function StorageUnitRow({ unit }: { unit: StorageUnit }) {
       : Math.min(100, (unit.contents.quantityKilograms / unit.capacityKilograms) * 100)
 
   return (
-    <li className="grid gap-[7px] rounded-md border border-[#1d282a] bg-[#060909] p-[9px]">
+    <li className="grid gap-[7px] rounded border border-[#0c1c2c] bg-[rgb(2_6_12_/_70%)] p-[9px]">
       <div className="flex justify-between gap-2.5">
-        <span className="text-[11px] uppercase text-[#7f999a]">
+        <span className="text-[10px] uppercase tracking-[0.12em] text-[#3a5c6e]">
           Unit {unit.slotNumber}
         </span>
-        <strong className="text-xs text-[#f2f7f6]">
+        <strong className="text-[11px] font-medium text-[#b4d4e4]">
           {unit.contents
             ? formatResourceName(unit.contents.resource)
             : 'Empty'}
         </strong>
       </div>
       <div
-        className="h-[5px] overflow-hidden rounded-full bg-[#172021]"
+        className="h-[3px] overflow-hidden rounded-full bg-[#0c1c2c]"
         aria-hidden="true"
       >
         <span
-          className="block h-full rounded-[inherit] bg-[#84cdb8]"
+          className="block h-full rounded-[inherit] bg-[#00c4e8] [box-shadow:0_0_6px_rgba(0,196,232,0.5)]"
           style={{ width: `${fillPercentage}%` }}
         />
       </div>

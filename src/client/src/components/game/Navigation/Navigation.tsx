@@ -49,7 +49,7 @@ export function Navigation({
 
   return (
     <section
-      className="relative min-h-0 min-w-0 overflow-hidden [grid-area:navigation] before:pointer-events-none before:absolute before:inset-0 before:bg-[length:48px_48px] before:[background-image:linear-gradient(rgb(84_113_110_/_9%)_1px,transparent_1px),linear-gradient(90deg,rgb(84_113_110_/_9%)_1px,transparent_1px)] before:[content:''] before:[mask-image:radial-gradient(circle,black_15%,transparent_78%)]"
+      className="relative min-h-0 min-w-0 overflow-hidden [grid-area:navigation] before:pointer-events-none before:absolute before:inset-0 before:bg-[length:48px_48px] before:[background-image:linear-gradient(rgb(0_80_140_/_7%)_1px,transparent_1px),linear-gradient(90deg,rgb(0_80_140_/_7%)_1px,transparent_1px)] before:[content:''] before:[mask-image:radial-gradient(circle,black_15%,transparent_78%)]"
       aria-label="Navigation"
     >
       <div className="absolute inset-0 grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-[18px] px-6 py-[22px] max-[800px]:gap-3.5 max-[800px]:p-4">
@@ -59,14 +59,14 @@ export function Navigation({
             <h2 className={panelHeading}>{activeLabel}</h2>
           </div>
           <div
-            className="inline-flex shrink-0 overflow-hidden rounded-md border border-[#2a3638] bg-[#060909] max-[800px]:w-full"
+            className="inline-flex shrink-0 overflow-hidden rounded border border-[#142840] bg-[rgb(3_8_14_/_90%)] max-[800px]:w-full"
             role="tablist"
             aria-label="Navigation view"
           >
             {navigationModes.map((navigationMode) => (
               <button
                 aria-selected={navigationMode.id === mode}
-                className="min-h-[34px] min-w-[104px] cursor-pointer border-0 border-r border-[#2a3638] bg-transparent px-3 text-xs font-[650] uppercase tracking-normal text-[#8ea6a7] last:border-r-0 aria-selected:bg-[#d7ece5] aria-selected:text-[#071011] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#f4f7f7] max-[800px]:min-w-0 max-[800px]:flex-1"
+                className="min-h-[34px] min-w-[104px] cursor-pointer border-0 border-r border-[#142840] bg-transparent px-3 text-[11px] font-medium uppercase tracking-[0.12em] text-[#3a5c6e] last:border-r-0 aria-selected:bg-[rgb(0_40_70_/_50%)] aria-selected:text-[#00c4e8] aria-selected:[box-shadow:inset_0_-1px_0_#00c4e8] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#00c4e8] hover:text-[#6a9aac] max-[800px]:min-w-0 max-[800px]:flex-1"
                 key={navigationMode.id}
                 onClick={() => setMode(navigationMode.id)}
                 role="tab"
