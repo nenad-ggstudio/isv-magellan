@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cx } from '../../../classNames'
+import { KnobControl } from '../../common/RotaryKnob'
 import type {
   EmScanReport,
   EmScanner,
@@ -362,7 +363,7 @@ function EmScannerDialog({
       className="fixed inset-0 z-50 grid min-h-0 place-items-center bg-[rgb(1_4_5_/_88%)] p-5 text-left backdrop-blur-sm max-[800px]:p-3"
       role="dialog"
     >
-      <section className="grid max-h-[calc(100svh-40px)] w-full max-w-[1120px] grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden rounded-md border border-[#36534f] bg-[rgb(5_12_13_/_96%)] p-4 shadow-[0_22px_90px_rgb(0_0_0_/_65%)] max-[800px]:max-h-[calc(100svh-24px)] max-[800px]:p-3">
+      <section className="grid max-h-[calc(100svh-40px)] w-full max-w-[1120px] grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden rounded-md border border-[#142840] bg-[rgb(3_8_18_/_97%)] p-4 shadow-[0_22px_90px_rgb(0_0_0_/_80%)] max-[800px]:max-h-[calc(100svh-24px)] max-[800px]:p-3">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="grid min-w-0 gap-0.5">
             <span className="text-[10px] uppercase text-[#7f999a]">
@@ -410,38 +411,19 @@ function EmScannerDialog({
             Easy-mode signal quality can be restored here later.
           */}
 
-          <div className="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
-            <label className="grid gap-1 text-[11px] uppercase text-[#91aaaa]">
-              <span className="flex items-center justify-between gap-3">
-                <span>Filter</span>
-                <span>{filter.toFixed(1)}</span>
-              </span>
-              <input
-                className="h-4 accent-[#70d6bd]"
-                max="100"
-                min="1"
-                onChange={(event) => setFilter(Number(event.target.value))}
-                step="0.5"
-                type="range"
-                value={filter}
-              />
-            </label>
-
-            <label className="grid gap-1 text-[11px] uppercase text-[#91aaaa]">
-              <span className="flex items-center justify-between gap-3">
-                <span>Focus</span>
-                <span>{focus.toFixed(1)}</span>
-              </span>
-              <input
-                className="h-4 accent-[#d4d56f]"
-                max="100"
-                min="1"
-                onChange={(event) => setFocus(Number(event.target.value))}
-                step="0.5"
-                type="range"
-                value={focus}
-              />
-            </label>
+          <div className="grid grid-cols-2 gap-6 max-[720px]:grid-cols-1">
+            <KnobControl
+              accentColor="#70d6bd"
+              label="Filter"
+              onChange={setFilter}
+              value={filter}
+            />
+            <KnobControl
+              accentColor="#d4d56f"
+              label="Focus"
+              onChange={setFocus}
+              value={focus}
+            />
           </div>
 
           <div className="grid grid-cols-5 gap-2 text-[10px] uppercase text-[#91aaaa] max-[900px]:grid-cols-3 max-[720px]:grid-cols-1">
@@ -526,6 +508,7 @@ function WaveLegendItem({
     </span>
   )
 }
+
 
 type EmSignalProfile = NonNullable<EmScanner['currentScan']>['signalProfile']
 
