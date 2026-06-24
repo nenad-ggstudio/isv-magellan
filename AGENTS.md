@@ -11,7 +11,7 @@ Magellan is split into a .NET backend and a Vite React client. Backend source li
 - `dotnet test Magellan.slnx`: run the xUnit test suite.
 - `dotnet run --project src/core/Magellan.Core`: start the ASP.NET Core/SignalR backend.
 - `cd src/client && npm ci`: install client dependencies from `package-lock.json`.
-- `cd src/client && npm run dev`: start the Vite dev server; run the backend first so `/hubs` proxies to `http://localhost:5204`.
+- `cd src/client && npm run dev`: start the Vite dev server on `http://localhost:5273`; run the backend first so `/hubs` proxies to `http://localhost:5304`.
 - `cd src/client && npm run build`: type-check and build the client.
 - `cd src/client && npm run lint`: run ESLint over TypeScript and React files.
 

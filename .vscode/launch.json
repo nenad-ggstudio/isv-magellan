@@ -13,7 +13,7 @@
       "console": "internalConsole",
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://localhost:5204"
+        "ASPNETCORE_URLS": "http://localhost:5304"
       },
       "serverReadyAction": {
         "action": "startDebugging",
@@ -26,7 +26,7 @@
       "type": "chrome",
       "request": "launch",
       "preLaunchTask": "client: dev",
-      "url": "http://127.0.0.1:5173",
+      "url": "http://127.0.0.1:5273",
       "webRoot": "${workspaceFolder}/src/client",
       "userDataDir": "${workspaceFolder}/.vscode/chrome-debug-profile"
     }

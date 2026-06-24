@@ -4,7 +4,7 @@
 
 **COLOSSUS-01** is a retro-futuristic sci-fi terminal experience inspired by classic science-fiction computer interfaces and the fantasy of speaking naturally with a ship computer.
 
-The project is **not intended as a productivity tool or commercial AI assistant**. It is primarily:
+The project is:
 - a creative hobby project,
 - a playable immersive interface,
 - a tribute to classic procedural sci-fi,
