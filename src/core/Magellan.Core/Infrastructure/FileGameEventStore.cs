@@ -8,18 +8,17 @@ namespace Infrastructure;
 
 public sealed class FileGameEventStore : IGameEventStore, IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true
-    };
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly Lock syncRoot = new();
     private readonly SemaphoreSlim appendGate = new(1, 1);
-    private readonly List<GameEventEnvelope> events = [];
-    private readonly List<PersistedGameEvent> persistedGameEvents = [];
+    private readonly Queue<GameEventEnvelope> replayEvents = [];
     private readonly string gameEventsPath;
+    private readonly string tickEventsPath;
     private readonly bool logTickEvents;
-    private readonly StreamWriter? tickWriter;
+    private readonly int replayBufferCapacity;
+    private StreamWriter? gameEventWriter;
+    private StreamWriter? tickWriter;
     private long sequence;
 
     public long CurrentSequence => Interlocked.Read(ref sequence);
@@ -29,27 +28,18 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
         IOptions<GameEventStoreOptions> options)
     {
         logTickEvents = options.Value.LogTickEvents;
+        replayBufferCapacity = Math.Max(1, options.Value.ReplayBufferCapacity);
 
         var dataDirectory = Path.Combine(environment.ContentRootPath, "App_Data");
         Directory.CreateDirectory(dataDirectory);
 
-        gameEventsPath = Path.Combine(dataDirectory, "game-events.json");
-        var tickEventsPath = Path.Combine(dataDirectory, "tick-game-events.tsv");
+        gameEventsPath = Path.Combine(dataDirectory, "game-events.jsonl");
+        tickEventsPath = Path.Combine(dataDirectory, "tick-game-events.tsv");
 
-        LoadExistingGameEvents(gameEventsPath);
+        LoadGameEventSequence(gameEventsPath);
         LoadTickSequence(tickEventsPath);
-
-        if (logTickEvents)
-        {
-            tickWriter = new StreamWriter(
-                new FileStream(
-                    tickEventsPath,
-                    FileMode.Append,
-                    FileAccess.Write,
-                    FileShare.Read,
-                    bufferSize: 64 * 1024,
-                    FileOptions.Asynchronous));
-        }
+        EnsureLogEndsWithNewLine(gameEventsPath);
+        EnsureLogEndsWithNewLine(tickEventsPath);
     }
 
     public async ValueTask<GameEventEnvelope> AppendAsync(
@@ -69,11 +59,7 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
             {
                 await AppendTickEvent(envelope, tickGameEvent, cancellationToken);
             }
-            else if (gameEvent is INonPersistedGameEvent)
-            {
-                // Client-only snapshots are replayable only for active subscribers.
-            }
-            else
+            else if (gameEvent is not INonPersistedGameEvent)
             {
                 await AppendGameEvent(envelope, cancellationToken);
             }
@@ -84,7 +70,12 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
 
                 if (gameEvent is not TickGameEvent)
                 {
-                    events.Add(envelope);
+                    replayEvents.Enqueue(envelope);
+
+                    while (replayEvents.Count > replayBufferCapacity)
+                    {
+                        replayEvents.Dequeue();
+                    }
                 }
             }
 
@@ -104,7 +95,7 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
 
         lock (syncRoot)
         {
-            snapshot = events
+            snapshot = replayEvents
                 .Where(gameEvent => gameEvent.Sequence > afterSequence)
                 .ToArray();
         }
@@ -120,6 +111,7 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
 
     public void Dispose()
     {
+        gameEventWriter?.Dispose();
         tickWriter?.Dispose();
         appendGate.Dispose();
     }
@@ -128,23 +120,11 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
         GameEventEnvelope envelope,
         CancellationToken cancellationToken)
     {
+        gameEventWriter ??= CreateAppendWriter(gameEventsPath);
         var persistedEvent = PersistedGameEvent.FromEnvelope(envelope);
-        PersistedGameEvent[] snapshot;
+        var line = JsonSerializer.Serialize(persistedEvent, JsonOptions);
 
-        lock (syncRoot)
-        {
-            snapshot = [.. persistedGameEvents, persistedEvent];
-        }
-
-        await File.WriteAllTextAsync(
-            gameEventsPath,
-            JsonSerializer.Serialize(snapshot, JsonOptions),
-            cancellationToken);
-
-        lock (syncRoot)
-        {
-            persistedGameEvents.Add(persistedEvent);
-        }
+        await gameEventWriter.WriteLineAsync(line.AsMemory(), cancellationToken);
     }
 
     private async Task AppendTickEvent(
@@ -152,10 +132,12 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
         TickGameEvent tickGameEvent,
         CancellationToken cancellationToken)
     {
-        if (!logTickEvents || tickWriter is null)
+        if (!logTickEvents)
         {
             return;
         }
+
+        tickWriter ??= CreateAppendWriter(tickEventsPath);
 
         var line = string.Create(
             CultureInfo.InvariantCulture,
@@ -164,36 +146,33 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
         await tickWriter.WriteLineAsync(line.AsMemory(), cancellationToken);
     }
 
-    private void LoadExistingGameEvents(string path)
+    private void LoadGameEventSequence(string path)
     {
         if (!File.Exists(path))
         {
             return;
         }
 
-        var json = File.ReadAllText(path);
-
-        if (string.IsNullOrWhiteSpace(json))
+        foreach (var line in File.ReadLines(path))
         {
-            return;
-        }
-
-        var persistedEvents =
-            JsonSerializer.Deserialize<List<PersistedGameEvent>>(json, JsonOptions) ?? [];
-
-        foreach (var persistedEvent in persistedEvents)
-        {
-            persistedGameEvents.Add(persistedEvent);
-            sequence = Math.Max(sequence, persistedEvent.Sequence);
-
-            var envelope = persistedEvent.ToEnvelope();
-
-            if (envelope is null)
+            if (string.IsNullOrWhiteSpace(line))
             {
                 continue;
             }
 
-            events.Add(envelope);
+            try
+            {
+                var persistedEvent = JsonSerializer.Deserialize<PersistedGameEvent>(line, JsonOptions);
+
+                if (persistedEvent is not null)
+                {
+                    sequence = Math.Max(sequence, persistedEvent.Sequence);
+                }
+            }
+            catch (JsonException)
+            {
+                // A diagnostic log may end with a partial line after an interrupted write.
+            }
         }
     }
 
@@ -222,6 +201,37 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
         }
     }
 
+    private static StreamWriter CreateAppendWriter(string path)
+    {
+        return new StreamWriter(
+            new FileStream(
+                path,
+                FileMode.Append,
+                FileAccess.Write,
+                FileShare.Read,
+                bufferSize: 64 * 1024,
+                FileOptions.Asynchronous))
+        {
+            AutoFlush = true
+        };
+    }
+
+    private static void EnsureLogEndsWithNewLine(string path)
+    {
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        {
+            return;
+        }
+
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        stream.Seek(-1, SeekOrigin.End);
+
+        if (stream.ReadByte() != '\n')
+        {
+            File.AppendAllText(path, Environment.NewLine);
+        }
+    }
+
     private sealed record PersistedGameEvent(
         long Sequence,
         DateTimeOffset OccurredAt,
@@ -240,31 +250,6 @@ public sealed class FileGameEventStore : IGameEventStore, IDisposable
                     envelope.Event,
                     envelope.Event.GetType(),
                     JsonOptions));
-        }
-
-        public GameEventEnvelope? ToEnvelope()
-        {
-            var eventType = ResolveEventType(Type);
-
-            if (eventType is null || !typeof(GameEvent).IsAssignableFrom(eventType))
-            {
-                return null;
-            }
-
-            var gameEvent = (GameEvent?)Payload.Deserialize(eventType, JsonOptions);
-
-            return gameEvent is null
-                ? null
-                : new GameEventEnvelope(Sequence, OccurredAt, gameEvent);
-        }
-
-        private static Type? ResolveEventType(string typeName)
-        {
-            return typeof(GameEvent).Assembly.GetType(typeName)
-                ?? AppDomain.CurrentDomain
-                    .GetAssemblies()
-                    .Select(assembly => assembly.GetType(typeName))
-                    .FirstOrDefault(type => type is not null);
         }
     }
 }

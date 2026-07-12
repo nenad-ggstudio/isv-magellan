@@ -53,8 +53,11 @@ try
             "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms.";
     });
 
-    app.MapGet("/", () => "Hello World!");
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+
     app.MapHub<GameHub>("/hubs/game");
+    app.MapFallbackToFile("index.html");
 
     app.Run();
 }

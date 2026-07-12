@@ -301,6 +301,37 @@ public sealed class GameManagerTests
     }
 
     [Fact]
+    public async Task StateTransitions_wait_for_an_in_progress_transition()
+    {
+        var store = new BlockingGameEventStore();
+        var manager = CreateManager(store);
+
+        var gameId = await StartNewGameAndReadGameId(manager, store);
+        store.BlockNextAppend();
+
+        var gravityScanTask = manager.StartGravityScanAsync("connection-1");
+        await store.WaitForBlockedAppendAsync();
+
+        var emScanTask = manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+
+        try
+        {
+            Assert.False(emScanTask.IsCompleted);
+        }
+        finally
+        {
+            store.ReleaseBlockedAppend();
+        }
+
+        await Task.WhenAll(gravityScanTask, emScanTask);
+
+        var state = ReadRequiredState(manager, gameId);
+
+        Assert.NotNull(state.Game!.Ship.Scanners.GravityScanner.CurrentScan);
+        Assert.NotNull(state.Game.Ship.Scanners.EmScanner.CurrentScan);
+    }
+
+    [Fact]
     public async Task StartEmScanAsync_publishes_active_scan_with_clamped_target()
     {
         var store = new InMemoryGameEventStore();
@@ -652,5 +683,58 @@ public sealed class GameManagerTests
         }
 
         return events;
+    }
+
+    private sealed class BlockingGameEventStore : IGameEventStore
+    {
+        private readonly InMemoryGameEventStore innerStore = new();
+        private TaskCompletionSource<bool> appendStarted = CreateSignal();
+        private TaskCompletionSource<bool> appendRelease = CreateSignal();
+        private int blockNextAppend;
+
+        public long CurrentSequence => innerStore.CurrentSequence;
+
+        public void BlockNextAppend()
+        {
+            appendStarted = CreateSignal();
+            appendRelease = CreateSignal();
+            Interlocked.Exchange(ref blockNextAppend, 1);
+        }
+
+        public Task WaitForBlockedAppendAsync()
+        {
+            return appendStarted.Task;
+        }
+
+        public void ReleaseBlockedAppend()
+        {
+            appendRelease.TrySetResult(true);
+        }
+
+        public async ValueTask<GameEventEnvelope> AppendAsync(
+            GameEvent gameEvent,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Exchange(ref blockNextAppend, 0) == 1)
+            {
+                appendStarted.TrySetResult(true);
+                await appendRelease.Task.WaitAsync(cancellationToken);
+            }
+
+            return await innerStore.AppendAsync(gameEvent, cancellationToken);
+        }
+
+        public IAsyncEnumerable<GameEventEnvelope> ReadAsync(
+            long afterSequence = 0,
+            CancellationToken cancellationToken = default)
+        {
+            return innerStore.ReadAsync(afterSequence, cancellationToken);
+        }
+
+        private static TaskCompletionSource<bool> CreateSignal()
+        {
+            return new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+        }
     }
 }

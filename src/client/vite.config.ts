@@ -5,6 +5,10 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    emptyOutDir: true,
+    outDir: '../core/Magellan.Core/wwwroot',
+  },
   server: {
     port: 5273,
     strictPort: true,

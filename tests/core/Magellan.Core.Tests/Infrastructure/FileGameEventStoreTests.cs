@@ -51,7 +51,7 @@ public sealed class FileGameEventStoreTests
     }
 
     [Fact]
-    public async Task AppendAsync_writes_non_tick_events_to_game_events_json()
+    public async Task AppendAsync_writes_non_tick_events_to_diagnostic_json_lines()
     {
         using var workspace = TestWorkspace.Create();
 
@@ -62,18 +62,22 @@ public sealed class FileGameEventStoreTests
 
         Assert.False(File.Exists(workspace.TickEventsPath));
 
-        using var document = JsonDocument.Parse(File.ReadAllText(workspace.GameEventsPath));
-        var persistedEvent = Assert.Single(document.RootElement.EnumerateArray());
+        var line = Assert.Single(File.ReadAllLines(workspace.GameEventsPath));
+        using var document = JsonDocument.Parse(line);
+        var persistedEvent = document.RootElement;
 
+        Assert.Equal(1, persistedEvent.GetProperty("sequence").GetInt64());
         Assert.Equal(typeof(TestGameEvent).FullName, persistedEvent.GetProperty("type").GetString());
         Assert.Equal(TestGameId, persistedEvent.GetProperty("gameId").GetGuid());
+        Assert.Equal("started", persistedEvent.GetProperty("payload").GetProperty("name").GetString());
 
         using var reloadedStore = CreateStore(workspace);
-        var replayed = await ReadSingle(reloadedStore);
-        var replayedEvent = Assert.IsType<TestGameEvent>(replayed.Event);
+        var replayedEvents = await ReadAll(reloadedStore);
+        var nextEvent = await reloadedStore.AppendAsync(
+            new TestGameEvent(TestGameId, "continued"));
 
-        Assert.Equal(TestGameId, replayedEvent.GameId);
-        Assert.Equal("started", replayedEvent.Name);
+        Assert.Empty(replayedEvents);
+        Assert.Equal(2, nextEvent.Sequence);
     }
 
     [Fact]
@@ -102,7 +106,7 @@ public sealed class FileGameEventStoreTests
     }
 
     [Fact]
-    public async Task AppendAsync_rehydrates_game_state_changed_events()
+    public async Task AppendAsync_logs_game_state_payload_without_rehydrating_it()
     {
         using var workspace = TestWorkspace.Create();
         var state = GameState.NewGame(TestGameId, DateTimeOffset.UtcNow);
@@ -112,61 +116,61 @@ public sealed class FileGameEventStoreTests
             await store.AppendAsync(new GameStateChangedGameEvent(TestGameId, state));
         }
 
+        var line = Assert.Single(File.ReadAllLines(workspace.GameEventsPath));
+        using var document = JsonDocument.Parse(line);
+        var loggedState = document.RootElement
+            .GetProperty("payload")
+            .GetProperty("state");
+
+        Assert.Equal(GameScreens.Game, loggedState.GetProperty("screen").GetString());
+        Assert.Equal(
+            TestGameId,
+            loggedState.GetProperty("game").GetProperty("id").GetGuid());
+
         using var reloadedStore = CreateStore(workspace);
-        var replayed = await ReadSingle(reloadedStore);
-        var replayedEvent = Assert.IsType<GameStateChangedGameEvent>(replayed.Event);
 
-        Assert.Equal(TestGameId, replayedEvent.GameId);
-        Assert.Equal(GameScreens.Game, replayedEvent.State.Screen);
+        Assert.Empty(await ReadAll(reloadedStore));
+    }
 
-        var expectedGame = Assert.IsType<ActiveGameState>(state.Game);
-        var actualGame = Assert.IsType<ActiveGameState>(replayedEvent.State.Game);
+    [Fact]
+    public async Task ReadAsync_keeps_only_the_configured_in_process_replay_window()
+    {
+        using var workspace = TestWorkspace.Create();
+        using var store = CreateStore(workspace, replayBufferCapacity: 2);
 
-        Assert.Equal(expectedGame.Id, actualGame.Id);
-        Assert.Equal(expectedGame.Name, actualGame.Name);
-        Assert.Equal(expectedGame.StartedAt, actualGame.StartedAt);
-        Assert.Equal(expectedGame.Resources, actualGame.Resources);
-        Assert.Equal(expectedGame.Ship.Name, actualGame.Ship.Name);
+        await store.AppendAsync(new TestGameEvent(TestGameId, "first"));
+        await store.AppendAsync(new TestGameEvent(TestGameId, "second"));
+        await store.AppendAsync(new TestGameEvent(TestGameId, "third"));
+
+        var replayedEvents = await ReadAll(store);
+
+        Assert.Equal([2L, 3L], replayedEvents.Select(gameEvent => gameEvent.Sequence));
         Assert.Equal(
-            expectedGame.Ship.StorageUnits.Select(unit => unit.SlotNumber),
-            actualGame.Ship.StorageUnits.Select(unit => unit.SlotNumber));
-        Assert.Equal(
-            expectedGame.Ship.StorageUnits.Select(unit => unit.Contents?.Resource),
-            actualGame.Ship.StorageUnits.Select(unit => unit.Contents?.Resource));
-        Assert.Equal(
-            expectedGame.Ship.FusionCore.DeuteriumReservoir.QuantityKilograms,
-            actualGame.Ship.FusionCore.DeuteriumReservoir.QuantityKilograms);
-        Assert.Equal(
-            expectedGame.Ship.FusionCore.TritiumReservoir.PurityLevel,
-            actualGame.Ship.FusionCore.TritiumReservoir.PurityLevel);
-        Assert.Equal(
-            expectedGame.Ship.FusionCore.CoolantTank.CapacityKilograms,
-            actualGame.Ship.FusionCore.CoolantTank.CapacityKilograms);
-        Assert.Equal(
-            expectedGame.Ship.BatteryBank.DesignCapacityKilowattHours,
-            actualGame.Ship.BatteryBank.DesignCapacityKilowattHours);
-        Assert.Equal(
-            expectedGame.Ship.BatteryBank.MaxCapacityKilowattHours,
-            actualGame.Ship.BatteryBank.MaxCapacityKilowattHours);
-        Assert.Equal(
-            expectedGame.Ship.BatteryBank.ChargeLevel,
-            actualGame.Ship.BatteryBank.ChargeLevel);
-        Assert.Equal(expectedGame.World.ShipPosition, actualGame.World.ShipPosition);
-        Assert.Equal(
-            expectedGame.World.LongRangeMap.Systems.Select(system => system.Id),
-            actualGame.World.LongRangeMap.Systems.Select(system => system.Id));
-        Assert.Equal(
-            expectedGame.World.JumpAreaMap.Systems.Select(system => system.Id),
-            actualGame.World.JumpAreaMap.Systems.Select(system => system.Id));
-        Assert.Equal(
-            expectedGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Id),
-            actualGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Id));
-        Assert.Equal(
-            expectedGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Kind),
-            actualGame.World.JumpAreaMap.Anomalies.Select(anomaly => anomaly.Kind));
-        Assert.Equal(
-            expectedGame.World.LocalMap.Contacts.Select(contact => contact.Id),
-            actualGame.World.LocalMap.Contacts.Select(contact => contact.Id));
+            ["second", "third"],
+            replayedEvents.Select(gameEvent => Assert.IsType<TestGameEvent>(gameEvent.Event).Name));
+    }
+
+    [Fact]
+    public async Task AppendAsync_continues_after_a_partial_diagnostic_log_line()
+    {
+        using var workspace = TestWorkspace.Create();
+
+        using (var store = CreateStore(workspace))
+        {
+            await store.AppendAsync(new TestGameEvent(TestGameId, "first"));
+        }
+
+        await File.AppendAllTextAsync(workspace.GameEventsPath, "{\"partial\":");
+
+        using (var store = CreateStore(workspace))
+        {
+            var nextEvent = await store.AppendAsync(
+                new TestGameEvent(TestGameId, "second"));
+
+            Assert.Equal(2, nextEvent.Sequence);
+        }
+
+        Assert.Equal(3, File.ReadAllLines(workspace.GameEventsPath).Length);
     }
 
     [Fact]
@@ -189,14 +193,16 @@ public sealed class FileGameEventStoreTests
 
     private static FileGameEventStore CreateStore(
         TestWorkspace workspace,
-        bool logTickEvents = false)
+        bool logTickEvents = false,
+        int replayBufferCapacity = 10_000)
     {
         return new FileGameEventStore(
             workspace.Environment,
             Options.Create(
                 new GameEventStoreOptions
                 {
-                    LogTickEvents = logTickEvents
+                    LogTickEvents = logTickEvents,
+                    ReplayBufferCapacity = replayBufferCapacity
                 }));
     }
 
@@ -236,7 +242,7 @@ public sealed class FileGameEventStoreTests
 
         public IWebHostEnvironment Environment { get; }
 
-        public string GameEventsPath => Path.Combine(RootPath, "App_Data", "game-events.json");
+        public string GameEventsPath => Path.Combine(RootPath, "App_Data", "game-events.jsonl");
 
         public string TickEventsPath => Path.Combine(RootPath, "App_Data", "tick-game-events.tsv");
 

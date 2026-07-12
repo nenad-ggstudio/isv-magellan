@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/client/package-lock.json
+
+      - name: Restore backend
+        run: dotnet restore Magellan.slnx
+
+      - name: Install client dependencies
+        working-directory: src/client
+        run: npm ci
+
+      - name: Test client
+        working-directory: src/client
+        run: npm test
+
+      - name: Lint client
+        working-directory: src/client
+        run: npm run lint
+
+      - name: Build client
+        working-directory: src/client
+        run: npm run build
+
+      - name: Test backend
+        run: dotnet test Magellan.slnx --no-restore --configuration Release

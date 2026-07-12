@@ -69,7 +69,8 @@ export function RotaryKnob({
   })
 
   function snap(v: number) {
-    return Math.max(min, Math.min(max, Math.round(v / step) * step))
+    const steppedValue = min + Math.round((v - min) / step) * step
+    return Math.max(min, Math.min(max, steppedValue))
   }
 
   function handlePointerDown(e: React.PointerEvent<SVGSVGElement>) {
@@ -90,6 +91,38 @@ export function RotaryKnob({
     isDragging.current = false
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<SVGSVGElement>) {
+    let nextValue: number | null = null
+
+    switch (e.key) {
+      case 'ArrowUp':
+      case 'ArrowRight':
+        nextValue = value + step
+        break
+      case 'ArrowDown':
+      case 'ArrowLeft':
+        nextValue = value - step
+        break
+      case 'PageUp':
+        nextValue = value + step * 10
+        break
+      case 'PageDown':
+        nextValue = value - step * 10
+        break
+      case 'Home':
+        nextValue = min
+        break
+      case 'End':
+        nextValue = max
+        break
+    }
+
+    if (nextValue !== null) {
+      e.preventDefault()
+      onChange(snap(nextValue))
+    }
+  }
+
   function handleWheel(e: React.WheelEvent) {
     e.stopPropagation()
     onChange(snap(value + (e.deltaY > 0 ? -step : step)))
@@ -101,13 +134,19 @@ export function RotaryKnob({
       aria-valuemax={max}
       aria-valuemin={min}
       aria-valuenow={value}
+      className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00c4e8]"
       height={SIZE}
+      onBlur={handlePointerUp}
+      onKeyDown={handleKeyDown}
+      onLostPointerCapture={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onWheel={handleWheel}
       role="slider"
       style={{ cursor: 'ns-resize', touchAction: 'none', userSelect: 'none' }}
+      tabIndex={0}
       viewBox={`0 0 ${SIZE} ${SIZE}`}
       width={SIZE}
     >

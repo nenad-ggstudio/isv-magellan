@@ -74,6 +74,9 @@ TestResults/
 # Publish output
 publish/
 
+# Generated Vite production client
+src/core/Magellan.Core/wwwroot/
+
 # ---------------------------------------------------
 # ASP.NET / Runtime
 # ---------------------------------------------------

@@ -22,4 +22,10 @@
     <ProjectReference Include="..\..\..\src\core\Magellan.Core\Magellan.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\..\src\client\src\gameHubContract.json"
+          Link="gameHubContract.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

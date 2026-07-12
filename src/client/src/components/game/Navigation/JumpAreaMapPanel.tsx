@@ -12,6 +12,20 @@ import {
   jumpAreaMajorGridStepLightYears,
   jumpAreaMinimumViewLightYears,
 } from './constants'
+import {
+  clamp,
+  formatRgb,
+  getEmWaveSettings,
+  getInitialPhase,
+  mixRgb,
+  normalizePositivePhase,
+  normalizeSignedPhase,
+  signedSeededRandom,
+  type EmSignalControls,
+  type EmSignalProfile,
+  type EmWaveSettings,
+  type RgbColor,
+} from './emSignalMath'
 import { getMapCenterPosition } from './mapMath'
 import { StellarMapView } from './StellarMapView'
 import { StellarReadout } from './StellarReadout'
@@ -510,13 +524,6 @@ function WaveLegendItem({
 }
 
 
-type EmSignalProfile = NonNullable<EmScanner['currentScan']>['signalProfile']
-
-type EmSignalControls = {
-  filter: number
-  focus: number
-}
-
 type EmNoisePulse = {
   startedAt: number
   duration: number
@@ -531,19 +538,8 @@ type EmWaveRenderStyle = {
   offsetY?: number
 }
 
-type RgbColor = {
-  r: number
-  g: number
-  b: number
-}
-
 const scannerSampleSpacing = 2
 const scannerScrollSpeed = 144
-const scannerMaximumNoiseFrequency = 14
-const scannerMinimumNoiseIntensity = 20
-const scannerMaximumNoiseIntensity = 120
-const scannerMinimumWavelength = 80
-const scannerMaximumWavelength = 620
 
 const signalGreen: RgbColor = { r: 61, g: 220, b: 132 }
 const signalPurple: RgbColor = { r: 174, g: 98, b: 255 }
@@ -905,101 +901,6 @@ function EmNoiseSignal({
       ref={canvasRef}
     />
   )
-}
-
-type EmWaveSettings = {
-  baseAmplitude: number
-  primaryWavelength: number
-  secondWavelength: number
-  actualNoiseIntensity: number
-  actualNoiseFrequency: number
-}
-
-function getEmWaveSettings(
-  signalProfile: EmSignalProfile,
-  controls: EmSignalControls,
-): EmWaveSettings {
-  const noiseFactor = getFilterNoiseFactor(
-    controls.filter,
-    signalProfile.idealFilter,
-  )
-  const actualNoiseIntensity =
-    scannerMinimumNoiseIntensity +
-    ((scannerMaximumNoiseIntensity - scannerMinimumNoiseIntensity) *
-      noiseFactor)
-
-  return {
-    baseAmplitude: signalProfile.baseAmplitude,
-    primaryWavelength: signalProfile.primaryWavelength,
-    secondWavelength: getSecondWavelength(signalProfile, controls.focus),
-    actualNoiseIntensity,
-    actualNoiseFrequency:
-      scannerMaximumNoiseFrequency *
-      (actualNoiseIntensity / scannerMaximumNoiseIntensity),
-  }
-}
-
-function getSecondWavelength(signalProfile: EmSignalProfile, focus: number) {
-  const primaryWavelength = signalProfile.primaryWavelength
-  const idealFocus = signalProfile.idealFocus
-  let secondWavelength = primaryWavelength
-
-  if (focus < idealFocus) {
-    const ratio = (idealFocus - focus) / Math.max(1, idealFocus - 1)
-    secondWavelength =
-      primaryWavelength +
-      ((scannerMaximumWavelength - primaryWavelength) * ratio)
-  } else if (focus > idealFocus) {
-    const ratio = (focus - idealFocus) / Math.max(1, 100 - idealFocus)
-    secondWavelength =
-      primaryWavelength +
-      ((scannerMinimumWavelength - primaryWavelength) * ratio)
-  }
-
-  return clamp(
-    Math.round(secondWavelength),
-    scannerMinimumWavelength,
-    scannerMaximumWavelength,
-  )
-}
-
-function getFilterNoiseFactor(filter: number, idealFilter: number) {
-  const distance = Math.abs(filter - idealFilter)
-  const maxDistance = Math.max(idealFilter, 100 - idealFilter)
-
-  return clamp(distance / Math.max(1, maxDistance), 0, 1)
-}
-
-function getInitialPhase(seed: number) {
-  return ((seed % 10_000) / 10_000) * Math.PI * 2
-}
-
-function normalizePositivePhase(radians: number) {
-  return ((radians % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2)
-}
-
-function normalizeSignedPhase(radians: number) {
-  return Math.atan2(Math.sin(radians), Math.cos(radians))
-}
-
-function signedSeededRandom(value: number) {
-  return (value * 2) - 1
-}
-
-function mixRgb(start: RgbColor, end: RgbColor, amount: number): RgbColor {
-  return {
-    r: Math.round(start.r + ((end.r - start.r) * amount)),
-    g: Math.round(start.g + ((end.g - start.g) * amount)),
-    b: Math.round(start.b + ((end.b - start.b) * amount)),
-  }
-}
-
-function formatRgb(color: RgbColor) {
-  return `rgb(${color.r}, ${color.g}, ${color.b})`
-}
-
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(maximum, Math.max(minimum, value))
 }
 
 function formatEmScanReportId(scanId: string, reportNumber: number) {

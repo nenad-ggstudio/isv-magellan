@@ -5,6 +5,7 @@ import {
   type HubConnection,
 } from '@microsoft/signalr'
 import { create } from 'zustand'
+import gameHubContract from '../gameHubContract.json'
 import type {
   ActiveGameState,
   BatteryBank,
@@ -13,6 +14,8 @@ import type {
   GameTick,
   GravityScanner,
 } from '../gameTypes'
+
+const { clientEvents, serverMethods } = gameHubContract
 
 const initialTick: GameTick = {
   elapsedMilliseconds: 0,
@@ -65,7 +68,7 @@ export const useGameStore = create<GameStore>((set) => ({
 
     connection = nextConnection
 
-    nextConnection.on('GameStateChanged', (nextState: GameState) => {
+    nextConnection.on(clientEvents.gameStateChanged, (nextState: GameState) => {
       if (connection !== nextConnection) {
         return
       }
@@ -76,14 +79,14 @@ export const useGameStore = create<GameStore>((set) => ({
         set({ gameState: nextState, tick: initialTick })
       }
     })
-    nextConnection.on('GameTick', (nextTick: GameTick) => {
+    nextConnection.on(clientEvents.gameTick, (nextTick: GameTick) => {
       if (connection !== nextConnection) {
         return
       }
 
       set({ tick: nextTick })
     })
-    nextConnection.on('BatteryBankChanged', (nextBatteryBank: BatteryBank) => {
+    nextConnection.on(clientEvents.batteryBankChanged, (nextBatteryBank: BatteryBank) => {
       if (connection !== nextConnection) {
         return
       }
@@ -97,7 +100,7 @@ export const useGameStore = create<GameStore>((set) => ({
       }))
     })
     nextConnection.on(
-      'GravityScannerChanged',
+      clientEvents.gravityScannerChanged,
       (nextGravityScanner: GravityScanner) => {
         if (connection !== nextConnection) {
           return
@@ -115,7 +118,7 @@ export const useGameStore = create<GameStore>((set) => ({
         }))
       },
     )
-    nextConnection.on('EmScannerChanged', (nextEmScanner: EmScanner) => {
+    nextConnection.on(clientEvents.emScannerChanged, (nextEmScanner: EmScanner) => {
       if (connection !== nextConnection) {
         return
       }
@@ -185,19 +188,19 @@ export const useGameStore = create<GameStore>((set) => ({
   startNewGame: async () => {
     if (connection?.state === HubConnectionState.Connected) {
       set({ tick: initialTick })
-      await connection.invoke('StartNewGame')
+      await connection.invoke(serverMethods.startNewGame)
     }
   },
 
   startGravityScan: async () => {
     if (connection?.state === HubConnectionState.Connected) {
-      await connection.invoke('StartGravityScan')
+      await connection.invoke(serverMethods.startGravityScan)
     }
   },
 
   startEmScan: async (x: number, y: number) => {
     if (connection?.state === HubConnectionState.Connected) {
-      await connection.invoke('StartEmScan', x, y)
+      await connection.invoke(serverMethods.startEmScan, x, y)
     }
   },
 
@@ -208,7 +211,7 @@ export const useGameStore = create<GameStore>((set) => ({
   ) => {
     if (connection?.state === HubConnectionState.Connected) {
       await connection.invoke(
-        'CaptureEmScanReport',
+        serverMethods.captureEmScanReport,
         focus,
         filter,
         phaseErrorRadians,
@@ -218,7 +221,7 @@ export const useGameStore = create<GameStore>((set) => ({
 
   stopEmScan: async () => {
     if (connection?.state === HubConnectionState.Connected) {
-      await connection.invoke('StopEmScan')
+      await connection.invoke(serverMethods.stopEmScan)
     }
   },
 }))
@@ -228,7 +231,7 @@ async function getGameState(currentConnection: HubConnection) {
     connection === currentConnection &&
     currentConnection.state === HubConnectionState.Connected
   ) {
-    await currentConnection.invoke('GetGameState')
+    await currentConnection.invoke(serverMethods.getGameState)
   }
 }
 

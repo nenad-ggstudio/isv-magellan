@@ -12,6 +12,7 @@ public sealed class GameManager(
     private readonly ConcurrentDictionary<string, Guid> connectionGames = new();
     private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> gameConnections = new();
     private readonly Lock currentGameGate = new();
+    private readonly SemaphoreSlim stateTransitionGate = new(1, 1);
     private Guid? currentGameId;
 
     public async Task ConnectAsync(
@@ -37,44 +38,62 @@ public sealed class GameManager(
         string connectionId,
         CancellationToken cancellationToken = default)
     {
-        var gameId = Guid.NewGuid();
-        var startedAt = DateTimeOffset.UtcNow;
-        var gameEvent = new GameStartedGameEvent(gameId, startedAt);
-        var state = GameStateReducer.Apply(null, gameEvent);
+        await stateTransitionGate.WaitAsync(cancellationToken);
 
-        ReplaceCurrentGame(gameId, state, connectionId);
-        gameEngine.StartNewGame(gameId, startedAt);
+        try
+        {
+            var gameId = Guid.NewGuid();
+            var startedAt = DateTimeOffset.UtcNow;
+            var gameEvent = new GameStartedGameEvent(gameId, startedAt);
+            var state = GameStateReducer.Apply(null, gameEvent);
 
-        await PublishGameEvent(
-            gameEvent,
-            "Game started.",
-            cancellationToken);
+            ReplaceCurrentGame(gameId, state, connectionId);
+            gameEngine.StartNewGame(gameId, startedAt);
+
+            await PublishGameEvent(
+                gameEvent,
+                "Game started.",
+                cancellationToken);
+        }
+        finally
+        {
+            stateTransitionGate.Release();
+        }
     }
 
     public async Task StartGravityScanAsync(
         string connectionId,
         CancellationToken cancellationToken = default)
     {
-        if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
-            || state?.Game is null)
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
         {
-            return;
+            if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+                || state?.Game is null)
+            {
+                return;
+            }
+
+            var tick = gameEngine.GetCurrentTick(gameId);
+            var activeGame = state.Game;
+            var scanner = activeGame.Ship.Scanners.GravityScanner;
+
+            if (scanner.IsScanInProgress(tick))
+            {
+                return;
+            }
+
+            await ApplyAndPublishGameEvent(
+                state,
+                new GravityScanStartedGameEvent(gameId, tick),
+                "Gravity scan started.",
+                cancellationToken);
         }
-
-        var tick = gameEngine.GetCurrentTick(gameId);
-        var activeGame = state.Game;
-        var scanner = activeGame.Ship.Scanners.GravityScanner;
-
-        if (scanner.IsScanInProgress(tick))
+        finally
         {
-            return;
+            stateTransitionGate.Release();
         }
-
-        await ApplyAndPublishGameEvent(
-            state,
-            new GravityScanStartedGameEvent(gameId, tick),
-            "Gravity scan started.",
-            cancellationToken);
     }
 
     public async Task StartEmScanAsync(
@@ -83,26 +102,35 @@ public sealed class GameManager(
         double targetY,
         CancellationToken cancellationToken = default)
     {
-        if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
-            || state?.Game is null)
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
         {
-            return;
+            if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+                || state?.Game is null)
+            {
+                return;
+            }
+
+            var activeGame = state.Game;
+            var scanner = activeGame.Ship.Scanners.EmScanner;
+
+            if (scanner.IsScanActive() || activeGame.Ship.BatteryBank.ChargeLevel <= 0)
+            {
+                return;
+            }
+
+            var tick = gameEngine.GetCurrentTick(gameId);
+            await ApplyAndPublishGameEvent(
+                state,
+                new EmScanStartedGameEvent(gameId, tick, targetX, targetY),
+                "EM scan started.",
+                cancellationToken);
         }
-
-        var activeGame = state.Game;
-        var scanner = activeGame.Ship.Scanners.EmScanner;
-
-        if (scanner.IsScanActive() || activeGame.Ship.BatteryBank.ChargeLevel <= 0)
+        finally
         {
-            return;
+            stateTransitionGate.Release();
         }
-
-        var tick = gameEngine.GetCurrentTick(gameId);
-        await ApplyAndPublishGameEvent(
-            state,
-            new EmScanStartedGameEvent(gameId, tick, targetX, targetY),
-            "EM scan started.",
-            cancellationToken);
     }
 
     public async Task CaptureEmScanReportAsync(
@@ -112,56 +140,74 @@ public sealed class GameManager(
         double phaseErrorRadians,
         CancellationToken cancellationToken = default)
     {
-        if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
-            || state?.Game is null)
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
         {
-            return;
+            if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+                || state?.Game is null)
+            {
+                return;
+            }
+
+            var activeGame = state.Game;
+            var scanner = activeGame.Ship.Scanners.EmScanner;
+
+            if (!scanner.IsScanActive())
+            {
+                return;
+            }
+
+            var tick = gameEngine.GetCurrentTick(gameId);
+            await ApplyAndPublishGameEvent(
+                state,
+                new EmScanReportCapturedGameEvent(
+                    gameId,
+                    tick,
+                    focus,
+                    filter,
+                    phaseErrorRadians),
+                "EM scan report captured.",
+                cancellationToken);
         }
-
-        var activeGame = state.Game;
-        var scanner = activeGame.Ship.Scanners.EmScanner;
-
-        if (!scanner.IsScanActive())
+        finally
         {
-            return;
+            stateTransitionGate.Release();
         }
-
-        var tick = gameEngine.GetCurrentTick(gameId);
-        await ApplyAndPublishGameEvent(
-            state,
-            new EmScanReportCapturedGameEvent(
-                gameId,
-                tick,
-                focus,
-                filter,
-                phaseErrorRadians),
-            "EM scan report captured.",
-            cancellationToken);
     }
 
     public async Task StopEmScanAsync(
         string connectionId,
         CancellationToken cancellationToken = default)
     {
-        if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
-            || state?.Game is null)
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
         {
-            return;
+            if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+                || state?.Game is null)
+            {
+                return;
+            }
+
+            var activeGame = state.Game;
+            var scanner = activeGame.Ship.Scanners.EmScanner;
+
+            if (!scanner.IsScanActive())
+            {
+                return;
+            }
+
+            await ApplyAndPublishGameEvent(
+                state,
+                new EmScanStoppedGameEvent(gameId),
+                "EM scan stopped.",
+                cancellationToken);
         }
-
-        var activeGame = state.Game;
-        var scanner = activeGame.Ship.Scanners.EmScanner;
-
-        if (!scanner.IsScanActive())
+        finally
         {
-            return;
+            stateTransitionGate.Release();
         }
-
-        await ApplyAndPublishGameEvent(
-            state,
-            new EmScanStoppedGameEvent(gameId),
-            "EM scan stopped.",
-            cancellationToken);
     }
 
     public async Task ApplyTickAsync(
@@ -169,45 +215,54 @@ public sealed class GameManager(
         GameTick tick,
         CancellationToken cancellationToken = default)
     {
-        if (!states.TryGetValue(gameId, out var state) || state.Game is null)
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
         {
-            return;
+            if (!states.TryGetValue(gameId, out var state) || state.Game is null)
+            {
+                return;
+            }
+
+            var activeGame = state.Game;
+            var scanner = activeGame.Ship.Scanners.EmScanner;
+            var currentScan = scanner.CurrentScan;
+
+            if (currentScan is null)
+            {
+                return;
+            }
+
+            var elapsedDrainIntervals =
+                (tick.Tick - currentScan.LastPowerDrainedAtTick)
+                / EmScanner.PowerDrainIntervalTicks;
+
+            if (elapsedDrainIntervals <= 0)
+            {
+                return;
+            }
+
+            var requestedChargeCost = elapsedDrainIntervals * EmScanner.PowerDrainChargeLevel;
+            var currentBattery = activeGame.Ship.BatteryBank;
+            var lastPowerDrainedAtTick = currentScan.LastPowerDrainedAtTick
+                + (elapsedDrainIntervals * EmScanner.PowerDrainIntervalTicks);
+
+            await ApplyAndPublishGameEvent(
+                state,
+                new EmScanPowerDrainedGameEvent(
+                    gameId,
+                    tick.Tick,
+                    elapsedDrainIntervals,
+                    requestedChargeCost,
+                    lastPowerDrainedAtTick,
+                    currentBattery.ChargeLevel <= requestedChargeCost),
+                "EM scan power drained.",
+                cancellationToken);
         }
-
-        var activeGame = state.Game;
-        var scanner = activeGame.Ship.Scanners.EmScanner;
-        var currentScan = scanner.CurrentScan;
-
-        if (currentScan is null)
+        finally
         {
-            return;
+            stateTransitionGate.Release();
         }
-
-        var elapsedDrainIntervals =
-            (tick.Tick - currentScan.LastPowerDrainedAtTick)
-            / EmScanner.PowerDrainIntervalTicks;
-
-        if (elapsedDrainIntervals <= 0)
-        {
-            return;
-        }
-
-        var requestedChargeCost = elapsedDrainIntervals * EmScanner.PowerDrainChargeLevel;
-        var currentBattery = activeGame.Ship.BatteryBank;
-        var lastPowerDrainedAtTick = currentScan.LastPowerDrainedAtTick
-            + (elapsedDrainIntervals * EmScanner.PowerDrainIntervalTicks);
-
-        await ApplyAndPublishGameEvent(
-            state,
-            new EmScanPowerDrainedGameEvent(
-                gameId,
-                tick.Tick,
-                elapsedDrainIntervals,
-                requestedChargeCost,
-                lastPowerDrainedAtTick,
-                currentBattery.ChargeLevel <= requestedChargeCost),
-            "EM scan power drained.",
-            cancellationToken);
     }
 
     public void Disconnect(string connectionId)

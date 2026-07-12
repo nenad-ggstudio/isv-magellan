@@ -1,0 +1,17 @@
+{
+  "serverMethods": {
+    "startNewGame": "StartNewGame",
+    "getGameState": "GetGameState",
+    "startGravityScan": "StartGravityScan",
+    "startEmScan": "StartEmScan",
+    "captureEmScanReport": "CaptureEmScanReport",
+    "stopEmScan": "StopEmScan"
+  },
+  "clientEvents": {
+    "gameStateChanged": "GameStateChanged",
+    "gameTick": "GameTick",
+    "batteryBankChanged": "BatteryBankChanged",
+    "gravityScannerChanged": "GravityScannerChanged",
+    "emScannerChanged": "EmScannerChanged"
+  }
+}
