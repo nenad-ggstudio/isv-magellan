@@ -15,8 +15,7 @@ public sealed record GravityScanner(
     private const double RoguePlanetAmplitude = 0.28;
     private const double RoguePlanetSigma = 0.014;
     private const double CometAmplitude = 0.16;
-    private const double CometParallelSigma = 0.12;
-    private const double CometPerpendicularSigma = 0.018;
+    private const double CometSigma = 0.026;
     private const double AsteroidClusterAmplitude = 0.045;
     private const double AsteroidClusterSigma = 0.026;
     private const double StellarCoreSigma = 0.07;
@@ -216,7 +215,6 @@ public sealed record GravityScanner(
 
     private sealed record GravityAnomalyProfile(
         SensorAnomaly Anomaly,
-        double AngleRadians,
         IReadOnlyList<(double X, double Y, double Amplitude)> ClusterNodes)
     {
         public static GravityAnomalyProfile ForAnomaly(SensorAnomaly anomaly, Random random)
@@ -227,7 +225,6 @@ public sealed record GravityScanner(
 
             return new GravityAnomalyProfile(
                 anomaly,
-                random.NextDouble() * Math.Tau,
                 clusterNodes);
         }
 
@@ -251,18 +248,12 @@ public sealed record GravityScanner(
 
         private double MeasureComet(double x, double y, Random random)
         {
-            var deltaX = x - Anomaly.X;
-            var deltaY = y - Anomaly.Y;
-            var cos = Math.Cos(AngleRadians);
-            var sin = Math.Sin(AngleRadians);
-            var parallel = (deltaX * cos) + (deltaY * sin);
-            var perpendicular = Math.Abs((-deltaX * sin) + (deltaY * cos));
-            var linearSignal = Math.Exp(
-                -((parallel * parallel) / (2 * CometParallelSigma * CometParallelSigma))
-                -((perpendicular * perpendicular) / (2 * CometPerpendicularSigma * CometPerpendicularSigma)));
+            var blobSignal = Gaussian(
+                DistanceBetween(x, y, Anomaly.X, Anomaly.Y),
+                CometSigma);
             var messiness = 0.74 + (random.NextDouble() * 0.42);
 
-            return CometAmplitude * linearSignal * messiness;
+            return CometAmplitude * blobSignal * messiness;
         }
 
         private double MeasureAsteroidCluster(double x, double y, Random random)

@@ -286,6 +286,41 @@ public sealed class GameManagerTests
     }
 
     [Fact]
+    public void StartScan_renders_comet_as_a_compact_blob()
+    {
+        var map = new JumpAreaMap(
+            "comet-test-map",
+            "Comet Test Map",
+            2,
+            2,
+            "light-years",
+            [],
+            [new SensorAnomaly(
+                "comet-001",
+                SensorAnomalyKinds.Comet,
+                "Comet",
+                1,
+                1,
+                80,
+                0,
+                20,
+                40)]);
+
+        var heatMap = GravityScanner.StartingScanner().StartScan(0, map).CurrentScan!.Result.HeatMap;
+        var centerSignal = ReadHeatMapValue(heatMap, 1, 1);
+        var surroundingSignal = Enumerable.Range(0, 32)
+            .Select(index => index * Math.Tau / 32)
+            .Max(angle => ReadHeatMapValue(
+                heatMap,
+                1 + (Math.Cos(angle) * 0.1),
+                1 + (Math.Sin(angle) * 0.1)));
+
+        Assert.True(
+            centerSignal > surroundingSignal * 1.5,
+            $"Expected a compact comet signal, but center {centerSignal} and surrounding maximum {surroundingSignal} indicate an elongated return.");
+    }
+
+    [Fact]
     public async Task StartGravityScanAsync_does_not_restart_active_scan()
     {
         var store = new InMemoryGameEventStore();
@@ -661,6 +696,14 @@ public sealed class GameManagerTests
         var deltaY = y2 - y1;
 
         return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+    }
+
+    private static double ReadHeatMapValue(GravityHeatMap heatMap, double x, double y)
+    {
+        var column = Math.Clamp((int)(x / heatMap.Width * heatMap.Columns), 0, heatMap.Columns - 1);
+        var row = Math.Clamp((int)(y / heatMap.Height * heatMap.Rows), 0, heatMap.Rows - 1);
+
+        return heatMap.Values[(row * heatMap.Columns) + column];
     }
 
     private static async Task<GameEventEnvelope> ReadSingle(IGameEventStore store)
