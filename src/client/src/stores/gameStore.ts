@@ -25,10 +25,13 @@ const initialTick: GameTick = {
 type GameStore = {
   connectionState: string
   gameState: GameState | null
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   tick: GameTick
   connect: () => Promise<void>
   disconnect: () => Promise<void>
   startNewGame: () => Promise<void>
+  saveGame: () => Promise<void>
+  loadGame: () => Promise<void>
   startGravityScan: () => Promise<void>
   startEmScan: (x: number, y: number) => Promise<void>
   captureEmScanReport: (
@@ -45,6 +48,7 @@ let isConnecting = false
 export const useGameStore = create<GameStore>((set) => ({
   connectionState: 'Starting',
   gameState: null,
+  saveStatus: 'idle',
   tick: initialTick,
 
   connect: async () => {
@@ -187,8 +191,30 @@ export const useGameStore = create<GameStore>((set) => ({
 
   startNewGame: async () => {
     if (connection?.state === HubConnectionState.Connected) {
-      set({ tick: initialTick })
+      set({ saveStatus: 'idle', tick: initialTick })
       await connection.invoke(serverMethods.startNewGame)
+    }
+  },
+
+  saveGame: async () => {
+    if (connection?.state !== HubConnectionState.Connected) {
+      return
+    }
+
+    set({ saveStatus: 'saving' })
+
+    try {
+      await connection.invoke(serverMethods.saveGame)
+      set({ saveStatus: 'saved' })
+    } catch {
+      set({ saveStatus: 'error' })
+    }
+  },
+
+  loadGame: async () => {
+    if (connection?.state === HubConnectionState.Connected) {
+      set({ saveStatus: 'idle', tick: initialTick })
+      await connection.invoke(serverMethods.loadGame)
     }
   },
 
@@ -253,6 +279,7 @@ function updateActiveGame(
         ...state.gameState,
         game: update(state.gameState.game),
       },
+      saveStatus: 'idle',
     }
   })
 }

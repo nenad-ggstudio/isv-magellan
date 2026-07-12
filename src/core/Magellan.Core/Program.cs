@@ -37,6 +37,7 @@ try
     builder.Services.Configure<GameEventStoreOptions>(
         builder.Configuration.GetSection(GameEventStoreOptions.SectionName));
     builder.Services.AddSingleton<IGameEventStore, FileGameEventStore>();
+    builder.Services.AddSingleton<IGameSaveStore, FileGameSaveStore>();
     builder.Services.AddSingleton<IGameEventBus, GameEventBus>();
     builder.Services.AddSingleton<GameEngine>();
     builder.Services.AddSingleton<GameManager>();

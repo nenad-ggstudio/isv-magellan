@@ -42,7 +42,10 @@ public sealed class GameManagerTests
 
         Assert.True(manager.TryGetClientState(gameEvent.GameId, out var state));
         Assert.Equal(GameScreens.Game, state!.Screen);
-        Assert.Empty(state.Actions);
+        Assert.Collection(
+            state.Actions,
+            action => Assert.Equal(GameActions.StartNewGame, action.Id),
+            action => Assert.Equal(GameActions.SaveGame, action.Id));
 
         var activeGame = Assert.IsType<ActiveGameState>(state.Game);
 
@@ -629,12 +632,87 @@ public sealed class GameManagerTests
             laterWorld.LocalMap.Contacts.Select(contact => (contact.Id, contact.X, contact.Y)));
     }
 
-    private static GameManager CreateManager(IGameEventStore store)
+    [Fact]
+    public async Task SaveGameAsync_persists_full_state_and_enables_load_action()
+    {
+        var eventStore = new InMemoryGameEventStore();
+        var saveStore = new InMemoryGameSaveStore();
+        var manager = CreateManager(eventStore, saveStore);
+
+        var gameId = await StartNewGameAndReadGameId(manager, eventStore);
+        await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+        await manager.SaveGameAsync("connection-1");
+
+        var save = await saveStore.LoadAsync();
+
+        Assert.NotNull(save);
+        Assert.Equal(GameSave.CurrentFormatVersion, save!.FormatVersion);
+        Assert.Equal(gameId, save.State.Game?.Id);
+        Assert.NotNull(save.State.Game?.Ship.Scanners.EmScanner.CurrentScan);
+        Assert.Contains(save.State.Actions, action => action.Id == GameActions.LoadGame);
+    }
+
+    [Fact]
+    public async Task LoadGameAsync_restores_saved_state_after_later_changes()
+    {
+        var eventStore = new InMemoryGameEventStore();
+        var saveStore = new InMemoryGameSaveStore();
+        var manager = CreateManager(eventStore, saveStore);
+
+        var gameId = await StartNewGameAndReadGameId(manager, eventStore);
+        await manager.StartEmScanAsync("connection-1", 0.2, 0.4);
+        await manager.SaveGameAsync("connection-1");
+        var savedCharge = ReadRequiredState(manager, gameId).Game!.Ship.BatteryBank.ChargeLevel;
+
+        await manager.ApplyTickAsync(gameId, new GameTick(2_500, 10));
+        Assert.True(
+            ReadRequiredState(manager, gameId).Game!.Ship.BatteryBank.ChargeLevel
+            < savedCharge);
+
+        await manager.LoadGameAsync("connection-1");
+
+        var restoredState = ReadRequiredState(manager, gameId);
+        Assert.Equal(savedCharge, restoredState.Game!.Ship.BatteryBank.ChargeLevel);
+        Assert.NotNull(restoredState.Game.Ship.Scanners.EmScanner.CurrentScan);
+
+        var events = await ReadAll(eventStore);
+        var loadedEvent = Assert.IsType<GameStateChangedGameEvent>(events.Last().Event);
+        Assert.Equal(gameId, loadedEvent.GameId);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_offers_load_when_a_save_exists()
+    {
+        var eventStore = new InMemoryGameEventStore();
+        var saveStore = new InMemoryGameSaveStore();
+        var state = GameState.NewGame(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        await saveStore.SaveAsync(
+            new GameSave(
+                GameSave.CurrentFormatVersion,
+                DateTimeOffset.UtcNow,
+                new GameTick(1_000, 4),
+                state));
+        var manager = CreateManager(eventStore, saveStore);
+
+        await manager.ConnectAsync("connection-1");
+
+        var envelope = await ReadSingle(eventStore);
+        var clientState = Assert.IsType<ClientGameStateChangedGameEvent>(envelope.Event).State;
+        Assert.Contains(clientState.Actions, action => action.Id == GameActions.LoadGame);
+    }
+
+    private static GameManager CreateManager(
+        IGameEventStore store,
+        IGameSaveStore? saveStore = null)
     {
         var bus = new GameEventBus(store);
         var gameEngine = new GameEngine(bus, NullLogger<GameEngine>.Instance);
 
-        return new GameManager(bus, gameEngine, NullLogger<GameManager>.Instance);
+        return new GameManager(
+            bus,
+            saveStore ?? new InMemoryGameSaveStore(),
+            gameEngine,
+            NullLogger<GameManager>.Instance);
     }
 
     private static async Task<Guid> StartNewGameAndReadGameId(

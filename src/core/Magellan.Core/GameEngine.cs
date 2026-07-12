@@ -11,7 +11,15 @@ public sealed class GameEngine(
 
     public void StartNewGame(Guid gameId, DateTimeOffset startedAt)
     {
-        sessions[gameId] = new GameSession(startedAt);
+        sessions[gameId] = new GameSession(startedAt, 0, 0);
+    }
+
+    public void ResumeGame(Guid gameId, GameTick savedTick)
+    {
+        sessions[gameId] = new GameSession(
+            DateTimeOffset.UtcNow,
+            savedTick.ElapsedMilliseconds,
+            savedTick.Tick);
     }
 
     public void StopGame(Guid gameId)
@@ -24,6 +32,13 @@ public sealed class GameEngine(
         return sessions.TryGetValue(gameId, out var session)
             ? session.CurrentTick
             : 0;
+    }
+
+    public GameTick GetCurrentGameTick(Guid gameId)
+    {
+        return sessions.TryGetValue(gameId, out var session)
+            ? session.Snapshot()
+            : new GameTick(0, 0);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -67,17 +82,48 @@ public sealed class GameEngine(
         }
     }
 
-    private sealed class GameSession(DateTimeOffset startedAt)
+    private sealed class GameSession(
+        DateTimeOffset resumedAt,
+        long elapsedMilliseconds,
+        long currentTick)
     {
-        private long tick;
+        private readonly Lock syncRoot = new();
+        private long tick = currentTick;
 
-        public long CurrentTick => Interlocked.Read(ref tick);
+        public long CurrentTick
+        {
+            get
+            {
+                lock (syncRoot)
+                {
+                    return tick;
+                }
+            }
+        }
+
+        public GameTick Snapshot()
+        {
+            lock (syncRoot)
+            {
+                return CreateTick(DateTimeOffset.UtcNow, tick);
+            }
+        }
 
         public GameTick NextTick(DateTimeOffset now)
         {
+            lock (syncRoot)
+            {
+                tick++;
+                return CreateTick(now, tick);
+            }
+        }
+
+        private GameTick CreateTick(DateTimeOffset now, long tickValue)
+        {
             return new GameTick(
-                (long)(now - startedAt).TotalMilliseconds,
-                Interlocked.Increment(ref tick));
+                elapsedMilliseconds
+                + Math.Max(0, (long)(now - resumedAt).TotalMilliseconds),
+                tickValue);
         }
     }
 }

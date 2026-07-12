@@ -8,11 +8,11 @@ public sealed record GameState(
     IReadOnlyList<GameStateAction> Actions,
     ActiveGameState? Game)
 {
-    public static GameState Bootstrap()
+    public static GameState Bootstrap(bool canLoadGame = false)
     {
         return new GameState(
             GameScreens.Bootstrap,
-            [new GameStateAction(GameActions.StartNewGame, "New Game")],
+            CreateBootstrapActions(canLoadGame),
             null);
     }
 
@@ -20,7 +20,7 @@ public sealed record GameState(
     {
         return new GameState(
             GameScreens.Game,
-            [],
+            CreateGameActions(canLoadGame: false),
             new ActiveGameState(
                 gameId,
                 "Magellan Sector",
@@ -31,6 +31,47 @@ public sealed record GameState(
                     new GameResource(0.01)),
                 GameWorld.StartingWorld(startedAt),
                 PlayerShip.StartingShip()));
+    }
+
+    public GameState WithSaveAvailable()
+    {
+        return this with
+        {
+            Actions = Screen == GameScreens.Game
+                ? CreateGameActions(canLoadGame: true)
+                : CreateBootstrapActions(canLoadGame: true)
+        };
+    }
+
+    private static IReadOnlyList<GameStateAction> CreateBootstrapActions(bool canLoadGame)
+    {
+        var actions = new List<GameStateAction>
+        {
+            new(GameActions.StartNewGame, "New Game")
+        };
+
+        if (canLoadGame)
+        {
+            actions.Add(new GameStateAction(GameActions.LoadGame, "Load Game"));
+        }
+
+        return actions;
+    }
+
+    private static IReadOnlyList<GameStateAction> CreateGameActions(bool canLoadGame)
+    {
+        var actions = new List<GameStateAction>
+        {
+            new(GameActions.StartNewGame, "New Game"),
+            new(GameActions.SaveGame, "Save Game")
+        };
+
+        if (canLoadGame)
+        {
+            actions.Add(new GameStateAction(GameActions.LoadGame, "Load Game"));
+        }
+
+        return actions;
     }
 }
 
@@ -60,4 +101,6 @@ public static class GameScreens
 public static class GameActions
 {
     public const string StartNewGame = "startNewGame";
+    public const string SaveGame = "saveGame";
+    public const string LoadGame = "loadGame";
 }

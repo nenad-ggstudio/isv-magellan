@@ -5,6 +5,7 @@ using Ship.Scanners;
 
 public sealed class GameManager(
     IGameEventBus gameEventBus,
+    IGameSaveStore gameSaveStore,
     GameEngine gameEngine,
     ILogger<GameManager> logger)
 {
@@ -30,7 +31,7 @@ public sealed class GameManager(
 
         await PublishClientStateChanged(
             connectionId,
-            GameState.Bootstrap(),
+            GameState.Bootstrap(await gameSaveStore.ExistsAsync(cancellationToken)),
             cancellationToken);
     }
 
@@ -47,6 +48,11 @@ public sealed class GameManager(
             var gameEvent = new GameStartedGameEvent(gameId, startedAt);
             var state = GameStateReducer.Apply(null, gameEvent);
 
+            if (await gameSaveStore.ExistsAsync(cancellationToken))
+            {
+                state = state.WithSaveAvailable();
+            }
+
             ReplaceCurrentGame(gameId, state, connectionId);
             gameEngine.StartNewGame(gameId, startedAt);
 
@@ -54,6 +60,84 @@ public sealed class GameManager(
                 gameEvent,
                 "Game started.",
                 cancellationToken);
+        }
+        finally
+        {
+            stateTransitionGate.Release();
+        }
+    }
+
+    public async Task SaveGameAsync(
+        string connectionId,
+        CancellationToken cancellationToken = default)
+    {
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+                || state?.Game is null)
+            {
+                return;
+            }
+
+            var savedState = state.WithSaveAvailable();
+            var save = new GameSave(
+                GameSave.CurrentFormatVersion,
+                DateTimeOffset.UtcNow,
+                gameEngine.GetCurrentGameTick(gameId),
+                savedState);
+
+            await gameSaveStore.SaveAsync(save, cancellationToken);
+            states[gameId] = savedState;
+
+            foreach (var connectedConnectionId in GetConnectionIds(gameId))
+            {
+                await PublishClientStateChanged(
+                    connectedConnectionId,
+                    savedState,
+                    cancellationToken);
+            }
+
+            logger.LogInformation(
+                "Game {GameId} saved at tick {Tick}.",
+                gameId,
+                save.Tick.Tick);
+        }
+        finally
+        {
+            stateTransitionGate.Release();
+        }
+    }
+
+    public async Task LoadGameAsync(
+        string connectionId,
+        CancellationToken cancellationToken = default)
+    {
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            var save = await gameSaveStore.LoadAsync(cancellationToken);
+
+            if (save?.State.Game is not ActiveGameState activeGame)
+            {
+                return;
+            }
+
+            var state = save.State.WithSaveAvailable();
+            ReplaceCurrentGame(activeGame.Id, state, connectionId);
+            gameEngine.ResumeGame(activeGame.Id, save.Tick);
+
+            await PublishGameEvent(
+                new GameStateChangedGameEvent(activeGame.Id, state),
+                "Game loaded.",
+                cancellationToken);
+
+            logger.LogInformation(
+                "Game {GameId} loaded from tick {Tick}.",
+                activeGame.Id,
+                save.Tick.Tick);
         }
         finally
         {

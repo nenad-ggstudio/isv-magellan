@@ -1,19 +1,35 @@
-import type { ActiveGameState } from '../../../gameTypes'
+import { useState } from 'react'
+import type { ActiveGameState, GameStateAction } from '../../../gameTypes'
 import { panelLabel, panelSurface } from '../styleClasses'
 
 type HeaderProps = {
+  actions: GameStateAction[]
   connectionState: string
   elapsedMilliseconds: number
   game: ActiveGameState
+  onLoadGame: () => void
+  onSaveGame: () => void
+  onStartNewGame: () => void
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   tick: number
 }
 
 export function Header({
+  actions,
   connectionState,
   elapsedMilliseconds,
   game,
+  onLoadGame,
+  onSaveGame,
+  onStartNewGame,
+  saveStatus,
   tick,
 }: HeaderProps) {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const canStartNew = actions.some((action) => action.id === 'startNewGame')
+  const canSave = actions.some((action) => action.id === 'saveGame')
+  const canLoad = actions.some((action) => action.id === 'loadGame')
+
   return (
     <header
       className={`${panelSurface} accent-top-line relative flex items-center justify-between gap-5 border-b px-6 [grid-area:header] max-[800px]:flex-col max-[800px]:items-stretch max-[800px]:p-4`}
@@ -104,8 +120,120 @@ export function Header({
             </div>
           </dl>
         </section>
+
+        <button
+          className="grid size-10 shrink-0 cursor-pointer place-items-center rounded border border-[#142840] bg-[rgb(3_8_14_/_85%)] text-[#6a9aac] transition-[border-color,color,box-shadow] hover:border-[#00c4e8] hover:text-[#c8dfe8] hover:[box-shadow:0_0_18px_rgba(0,196,232,0.18)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00c4e8] max-[800px]:absolute max-[800px]:right-4 max-[800px]:top-4"
+          type="button"
+          aria-label="Open game settings"
+          aria-haspopup="dialog"
+          aria-expanded={isSettingsOpen}
+          onClick={() => setIsSettingsOpen(true)}
+        >
+          <svg
+            className="size-[18px]"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+          >
+            <path d="M12 15.25A3.25 3.25 0 1 0 12 8.75a3.25 3.25 0 0 0 0 6.5Z" />
+            <path d="m19.2 13.05 1.35 1.05-1.8 3.12-1.58-.65a7.9 7.9 0 0 1-1.82 1.05l-.23 1.7h-3.6l-.23-1.7a7.9 7.9 0 0 1-1.82-1.05l-1.58.65-1.8-3.12 1.35-1.05a8.4 8.4 0 0 1 0-2.1L6.1 9.9l1.8-3.12 1.58.65a7.9 7.9 0 0 1 1.82-1.05l.23-1.7h3.6l.23 1.7a7.9 7.9 0 0 1 1.82 1.05l1.58-.65 1.8 3.12-1.35 1.05a8.4 8.4 0 0 1 0 2.1Z" />
+          </svg>
+        </button>
       </div>
+
+      {isSettingsOpen && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-[rgb(0_3_7_/_78%)] p-4 backdrop-blur-[2px]"
+          role="presentation"
+          onMouseDown={() => setIsSettingsOpen(false)}
+        >
+          <section
+            className="sci-corners-on w-full max-w-[360px] rounded border border-[#1b4050] bg-[#040a12] p-5 text-left shadow-[0_0_50px_rgba(0,196,232,0.12)]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="game-settings-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="mb-5 flex items-center justify-between gap-4 border-b border-[#142840] pb-3">
+              <div>
+                <p className="m-0 text-[9px] uppercase tracking-[0.2em] text-[#3a5c6e]">
+                  Command System
+                </p>
+                <h2
+                  className="m-0 mt-1 text-sm font-medium uppercase tracking-[0.14em] text-[#00c4e8]"
+                  id="game-settings-title"
+                >
+                  Game Settings
+                </h2>
+              </div>
+              <button
+                className="grid size-8 cursor-pointer place-items-center rounded border border-[#142840] text-[#6a9aac] hover:border-[#00c4e8] hover:text-[#c8dfe8]"
+                type="button"
+                aria-label="Close game settings"
+                onClick={() => setIsSettingsOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid gap-2">
+              <SettingsAction
+                disabled={!canStartNew}
+                label="New Game"
+                onClick={() => {
+                  setIsSettingsOpen(false)
+                  onStartNewGame()
+                }}
+              />
+              <SettingsAction
+                disabled={!canSave || saveStatus === 'saving'}
+                label={
+                  saveStatus === 'saving'
+                    ? 'Saving…'
+                    : saveStatus === 'saved'
+                      ? 'Game Saved'
+                      : saveStatus === 'error'
+                        ? 'Retry Save'
+                        : 'Save Game'
+                }
+                onClick={onSaveGame}
+              />
+              <SettingsAction
+                disabled={!canLoad}
+                label="Load Game"
+                onClick={() => {
+                  setIsSettingsOpen(false)
+                  onLoadGame()
+                }}
+              />
+            </div>
+          </section>
+        </div>
+      )}
     </header>
+  )
+}
+
+function SettingsAction({
+  disabled,
+  label,
+  onClick,
+}: {
+  disabled: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      className="min-h-11 cursor-pointer rounded border border-[#142840] bg-[rgb(0_20_34_/_45%)] px-4 text-left text-[10px] uppercase tracking-[0.16em] text-[#6a9aac] transition-[background,border-color,color] hover:border-[#00c4e8] hover:bg-[rgb(0_30_50_/_65%)] hover:text-[#c8dfe8] disabled:cursor-not-allowed disabled:opacity-35"
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {label}
+    </button>
   )
 }
 
