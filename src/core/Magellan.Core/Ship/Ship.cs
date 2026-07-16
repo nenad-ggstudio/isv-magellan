@@ -1,6 +1,7 @@
 using ShipBatteryBank = Ship.BatteryBank.BatteryBank;
 using ShipFusionCore = Ship.FusionCore.FusionCore;
 using ShipScanners = Ship.Scanners.ShipScanners;
+using ShipJumpDrive = Ship.JumpDrive.JumpDrive;
 
 namespace Ship;
 
@@ -11,13 +12,15 @@ public sealed class Ship
         IReadOnlyList<StorageUnit> storageUnits,
         ShipFusionCore fusionCore,
         ShipBatteryBank batteryBank,
-        ShipScanners scanners)
+        ShipScanners scanners,
+        ShipJumpDrive? jumpDrive = null)
     {
         Name = name;
         StorageUnits = storageUnits;
         FusionCore = fusionCore;
         BatteryBank = batteryBank;
         Scanners = scanners;
+        JumpDrive = jumpDrive ?? ShipJumpDrive.StartingDrive();
     }
 
     public string Name { get; }
@@ -30,6 +33,8 @@ public sealed class Ship
 
     public ShipScanners Scanners { get; }
 
+    public ShipJumpDrive JumpDrive { get; }
+
     public Ship WithScanners(ShipScanners scanners)
     {
         return new Ship(
@@ -37,7 +42,8 @@ public sealed class Ship
             StorageUnits,
             FusionCore,
             BatteryBank,
-            scanners);
+            scanners,
+            JumpDrive);
     }
 
     public Ship WithBatteryBank(ShipBatteryBank batteryBank)
@@ -47,7 +53,19 @@ public sealed class Ship
             StorageUnits,
             FusionCore,
             batteryBank,
-            Scanners);
+            Scanners,
+            JumpDrive);
+    }
+
+    public Ship WithFusionCore(ShipFusionCore fusionCore)
+    {
+        return new Ship(
+            Name,
+            StorageUnits,
+            fusionCore,
+            BatteryBank,
+            Scanners,
+            JumpDrive);
     }
 
     public static Ship StartingShip()
@@ -80,6 +98,7 @@ public sealed class Ship
             ],
             ShipFusionCore.StartingCore(),
             ShipBatteryBank.StartingBank(),
-            ShipScanners.StartingScanners());
+            ShipScanners.StartingScanners(),
+            ShipJumpDrive.StartingDrive());
     }
 }

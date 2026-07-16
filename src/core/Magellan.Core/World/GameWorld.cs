@@ -62,6 +62,39 @@ public sealed record GameWorld(
         );
     }
 
+    public GameWorld JumpTo(
+        double destinationX,
+        double destinationY,
+        DateTimeOffset jumpedAt)
+    {
+        var shipPosition = new WorldPosition(
+            "Deep Space",
+            destinationX,
+            destinationY,
+            LongRangeMap.DistanceUnit);
+        var longRangeMap = LongRangeMap with
+        {
+            Systems =
+            [
+                .. LongRangeMap.Systems.Select(system => system with
+                {
+                    Distance = DistanceBetween(
+                        destinationX,
+                        destinationY,
+                        system.X,
+                        system.Y)
+                })
+            ]
+        };
+
+        return new GameWorld(
+            shipPosition,
+            jumpedAt,
+            longRangeMap,
+            BuildJumpAreaMap(longRangeMap, shipPosition, jumpedAt),
+            BuildLocalMap(shipPosition, jumpedAt));
+    }
+
     private static LongRangeMapData LoadLongRangeMapData()
     {
         var path = Path.Combine(AppContext.BaseDirectory, LongRangeMapPath);

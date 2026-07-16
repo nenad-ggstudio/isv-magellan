@@ -1,5 +1,6 @@
 using Infrastructure;
 using Microsoft.AspNetCore.SignalR;
+using Ship.JumpDrive;
 
 public sealed class GameHub(GameManager gameManager) : Hub<IGameClient>
 {
@@ -45,6 +46,25 @@ public sealed class GameHub(GameManager gameManager) : Hub<IGameClient>
     public Task StopEmScan()
     {
         return gameManager.StopEmScanAsync(Context.ConnectionId);
+    }
+
+    public Task<JumpQuote?> GetJumpQuote(double x, double y)
+    {
+        return gameManager.GetJumpQuoteAsync(Context.ConnectionId, x, y);
+    }
+
+    public Task<bool> Jump(
+        double expectedOriginX,
+        double expectedOriginY,
+        double targetX,
+        double targetY)
+    {
+        return gameManager.JumpAsync(
+            Context.ConnectionId,
+            expectedOriginX,
+            expectedOriginY,
+            targetX,
+            targetY);
     }
 
     public override async Task OnConnectedAsync()

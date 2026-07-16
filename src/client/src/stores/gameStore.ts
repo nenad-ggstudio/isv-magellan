@@ -13,6 +13,7 @@ import type {
   GameState,
   GameTick,
   GravityScanner,
+  JumpQuote,
 } from '../gameTypes'
 
 const { clientEvents, serverMethods } = gameHubContract
@@ -40,6 +41,13 @@ type GameStore = {
     phaseErrorRadians: number,
   ) => Promise<void>
   stopEmScan: () => Promise<void>
+  getJumpQuote: (x: number, y: number) => Promise<JumpQuote | null>
+  jump: (
+    expectedOriginX: number,
+    expectedOriginY: number,
+    targetX: number,
+    targetY: number,
+  ) => Promise<boolean>
 }
 
 let connection: HubConnection | null = null
@@ -249,6 +257,33 @@ export const useGameStore = create<GameStore>((set) => ({
     if (connection?.state === HubConnectionState.Connected) {
       await connection.invoke(serverMethods.stopEmScan)
     }
+  },
+
+  getJumpQuote: async (x: number, y: number) => {
+    if (connection?.state !== HubConnectionState.Connected) {
+      return null
+    }
+
+    return connection.invoke<JumpQuote | null>(serverMethods.getJumpQuote, x, y)
+  },
+
+  jump: async (
+    expectedOriginX: number,
+    expectedOriginY: number,
+    targetX: number,
+    targetY: number,
+  ) => {
+    if (connection?.state !== HubConnectionState.Connected) {
+      return false
+    }
+
+    return connection.invoke<boolean>(
+      serverMethods.jump,
+      expectedOriginX,
+      expectedOriginY,
+      targetX,
+      targetY,
+    )
   },
 }))
 

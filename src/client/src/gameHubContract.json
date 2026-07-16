@@ -7,7 +7,9 @@
     "startGravityScan": "StartGravityScan",
     "startEmScan": "StartEmScan",
     "captureEmScanReport": "CaptureEmScanReport",
-    "stopEmScan": "StopEmScan"
+    "stopEmScan": "StopEmScan",
+    "getJumpQuote": "GetJumpQuote",
+    "jump": "Jump"
   },
   "clientEvents": {
     "gameStateChanged": "GameStateChanged",

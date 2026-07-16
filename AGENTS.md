@@ -21,6 +21,10 @@ You are allowed to run dev servers for internal testing, once you are done, STOP
 
 C# uses nullable reference types, implicit usings, four-space indentation, PascalCase for public types/members, and camelCase for locals and parameters. Keep domain models in their current feature folders and prefer small, explicit value objects over loosely typed dictionaries. TypeScript uses two-space indentation, single quotes, extensionless relative imports, PascalCase React components, and camelCase hooks/store members. Let ESLint and TypeScript be the source of truth for client style.
 
+## Prototype Compatibility Policy
+
+Magellan is in the prototype phase. Do not preserve backward compatibility for code contracts, APIs, serialized data, saved games, configuration, or world data unless the user explicitly requests it. Prefer the cleanest current design and update or remove affected callers, tests, and data together. Do not add migrations, legacy fallbacks, compatibility constructors, deprecated fields, version shims, or similar compatibility-only code by default.
+
 ## Testing Guidelines
 
 Backend tests use xUnit. Name test methods with the pattern `MethodName_expected_behavior`, as in `ConnectAsync_publishes_bootstrap_state_with_start_new_game_action`. Place new backend tests in the matching `tests/core/Magellan.Core.Tests` area. Run `dotnet test Magellan.slnx` before submitting backend changes. There is no client test runner configured yet, so use `npm run lint` and `npm run build` for client validation.

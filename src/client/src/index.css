@@ -172,3 +172,191 @@ select {
   background-repeat: no-repeat;
   opacity: 0.25;
 }
+
+/* ─── Jump transition ─────────────────────────────────────── */
+
+@keyframes jump-screen-shake {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.04); }
+  20% { transform: translate3d(-0.35%, 0.2%, 0) scale(1.04); }
+  40% { transform: translate3d(0.3%, -0.25%, 0) scale(1.04); }
+  60% { transform: translate3d(-0.2%, -0.15%, 0) scale(1.04); }
+  80% { transform: translate3d(0.25%, 0.3%, 0) scale(1.04); }
+}
+
+@keyframes jump-warp-streak {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--warp-angle)) translateY(1vmin) scaleY(0.04);
+  }
+  12% { opacity: 0.9; }
+  78% { opacity: 0.75; }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--warp-angle)) translateY(72vmax) scaleY(2.8);
+  }
+}
+
+@keyframes jump-bloom-pulse {
+  0%, 100% { opacity: 0.68; transform: translate(-50%, -50%) scale(0.78); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+}
+
+@keyframes jump-tunnel-expand {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.08); }
+  18% { opacity: 0.7; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(4.5); }
+}
+
+@keyframes jump-flash {
+  0% { opacity: 0.95; }
+  8% { opacity: 0.08; }
+  15%, 82% { opacity: 0; }
+  92% { opacity: 0.22; }
+  100% { opacity: 0; }
+}
+
+@keyframes jump-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes jump-transition-reveal {
+  0%, 83.333% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.jump-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at center, rgba(0, 196, 232, 0.24), transparent 14%),
+    radial-gradient(circle at center, #062433 0, #02070c 36%, #000 82%);
+  color: #dffaff;
+  animation: jump-transition-reveal 3s ease-in-out both;
+  will-change: opacity;
+}
+
+.jump-transition__shake {
+  position: absolute;
+  inset: -5%;
+  animation: jump-screen-shake 120ms steps(2, end) infinite;
+}
+
+.jump-transition__streaks {
+  position: absolute;
+  inset: 0;
+}
+
+.jump-transition__streak {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: var(--warp-length);
+  border-radius: 999px;
+  background: linear-gradient(to bottom, transparent, #91edff 38%, #fff);
+  box-shadow: 0 0 8px rgba(91, 227, 250, 0.9);
+  opacity: 0;
+  transform-origin: 50% 0;
+  animation: jump-warp-streak 700ms linear infinite;
+}
+
+.jump-transition__bloom {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12vmin;
+  height: 12vmin;
+  border-radius: 50%;
+  background: #efffff;
+  box-shadow:
+    0 0 3vmin #fff,
+    0 0 12vmin #00c4e8,
+    0 0 28vmin rgba(0, 196, 232, 0.6);
+  animation: jump-bloom-pulse 480ms ease-in-out infinite;
+}
+
+.jump-transition__tunnel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24vmin;
+  height: 24vmin;
+  border: 2px solid rgba(145, 237, 255, 0.5);
+  border-radius: 50%;
+  box-shadow: 0 0 4vmin rgba(0, 196, 232, 0.7);
+  animation: jump-tunnel-expand 1.1s ease-out infinite;
+}
+
+.jump-transition__tunnel--inner {
+  animation-delay: -550ms;
+}
+
+.jump-transition__flash {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: #eaffff;
+  opacity: 0;
+  animation: jump-flash 3s ease-out both;
+}
+
+.jump-transition__readout {
+  position: absolute;
+  z-index: 3;
+  bottom: clamp(28px, 6svh, 72px);
+  left: 50%;
+  display: grid;
+  width: min(420px, calc(100vw - 48px));
+  gap: 8px;
+  transform: translateX(-50%);
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 0 16px rgba(0, 196, 232, 0.9);
+}
+
+.jump-transition__readout > span {
+  color: #57a8bb;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+}
+
+.jump-transition__readout > strong {
+  color: #e9fdff;
+  font-size: clamp(15px, 2.4vw, 22px);
+  letter-spacing: 0.12em;
+}
+
+.jump-transition__progress {
+  height: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+  background: rgba(0, 196, 232, 0.2);
+}
+
+.jump-transition__progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left;
+  background: #9af1ff;
+  box-shadow: 0 0 12px #00c4e8;
+  animation: jump-progress 3s linear both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jump-transition__shake {
+    animation: none;
+    transform: scale(1.04);
+  }
+
+  .jump-transition__streak,
+  .jump-transition__bloom,
+  .jump-transition__tunnel {
+    animation-duration: 2.4s;
+  }
+}

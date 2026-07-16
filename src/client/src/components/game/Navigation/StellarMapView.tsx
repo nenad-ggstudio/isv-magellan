@@ -35,6 +35,7 @@ export function StellarMapView({
   emScanTarget,
   gizmoReferenceSpan,
   gravityHeatMap,
+  jumpTarget,
   gridStep,
   map,
   majorGridStep,
@@ -46,11 +47,13 @@ export function StellarMapView({
   selectedSystemId,
   shipPosition,
   targeting = false,
+  targetingLabel = 'Choose map target',
 }: {
   emScanReports?: EmScanReport[]
   emScanTarget?: { x: number; y: number; radiusLightYears: number } | null
   gizmoReferenceSpan: number
   gravityHeatMap?: GravityHeatMap | null
+  jumpTarget?: MapPosition | null
   gridStep: number
   map: StellarMap
   majorGridStep: number
@@ -62,6 +65,7 @@ export function StellarMapView({
   selectedSystemId: string | null
   shipPosition: MapPosition
   targeting?: boolean
+  targetingLabel?: string
 }) {
   const [viewport, setViewport] = useState(() =>
     getInitialSectorViewport(map),
@@ -422,9 +426,10 @@ export function StellarMapView({
             target={emScanTarget}
           />
         ) : null}
+        {jumpTarget ? <JumpTargetMarker map={map} target={jumpTarget} /> : null}
         {targeting ? (
           <rect
-            aria-label="Choose EM scan target"
+            aria-label={targetingLabel}
             className="cursor-crosshair fill-transparent"
             height={map.height}
             onPointerCancel={handleTargetPointerCancel}
@@ -437,6 +442,34 @@ export function StellarMapView({
         ) : null}
       </svg>
     </div>
+  )
+}
+
+function JumpTargetMarker({
+  map,
+  target,
+}: {
+  map: StellarMap
+  target: MapPosition
+}) {
+  const point = toSectorMapPoint(target, map)
+
+  return (
+    <g className="pointer-events-none" aria-label="Jump target">
+      <circle
+        className="fill-[rgb(0_196_232_/_10%)] stroke-[#00c4e8]"
+        cx={point.x}
+        cy={point.y}
+        r="0.065"
+        strokeDasharray="0.018 0.012"
+        strokeWidth="0.012"
+      />
+      <path
+        className="stroke-[#f4f7f7]"
+        d={`M${point.x - 0.045} ${point.y}H${point.x + 0.045}M${point.x} ${point.y - 0.045}V${point.y + 0.045}`}
+        strokeWidth="0.012"
+      />
+    </g>
   )
 }
 

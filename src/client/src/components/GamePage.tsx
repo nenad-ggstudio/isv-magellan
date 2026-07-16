@@ -3,7 +3,12 @@ import { CrewHub } from './game/CrewHub/CrewHub'
 import { Header } from './game/Header/Header'
 import { Navigation } from './game/Navigation/Navigation'
 import { ShipStatus } from './game/ShipStatus/ShipStatus'
-import type { ActiveGameState, GameStateAction, GameTick } from '../gameTypes'
+import type {
+  ActiveGameState,
+  GameStateAction,
+  GameTick,
+  JumpQuote,
+} from '../gameTypes'
 
 type GamePageProps = {
   connectionState: string
@@ -20,6 +25,13 @@ type GamePageProps = {
   onStartEmScan: (x: number, y: number) => Promise<void>
   onStartGravityScan: () => Promise<void>
   onStopEmScan: () => Promise<void>
+  onGetJumpQuote: (x: number, y: number) => Promise<JumpQuote | null>
+  onJump: (
+    expectedOriginX: number,
+    expectedOriginY: number,
+    targetX: number,
+    targetY: number,
+  ) => Promise<boolean>
   tick: GameTick
   saveStatus: 'idle' | 'saving' | 'saved' | 'error'
 }
@@ -35,6 +47,8 @@ export function GamePage({
   onStartEmScan,
   onStartGravityScan,
   onStopEmScan,
+  onGetJumpQuote,
+  onJump,
   tick,
   saveStatus,
 }: GamePageProps) {
@@ -60,6 +74,8 @@ export function GamePage({
         onStartEmScan={onStartEmScan}
         onStartGravityScan={onStartGravityScan}
         onStopEmScan={onStopEmScan}
+        onGetJumpQuote={onGetJumpQuote}
+        onJump={onJump}
         tick={tick.tick}
         world={game.world}
       />

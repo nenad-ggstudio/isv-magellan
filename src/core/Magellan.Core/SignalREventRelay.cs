@@ -64,6 +64,10 @@ public sealed class SignalREventRelay(
                 await PublishBatteryBank(powerDrained.GameId);
                 await PublishEmScanner(powerDrained.GameId);
             }
+            else if (envelope.Event is JumpCompletedGameEvent jumpCompleted)
+            {
+                await PublishGameState(jumpCompleted.GameId);
+            }
             else if (envelope.Event is TickGameEvent gameTick)
             {
                 foreach (var connectionId in gameManager.GetConnectionIds(gameTick.GameId))

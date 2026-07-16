@@ -2,6 +2,7 @@ using Events;
 using Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
 using Ship.Scanners;
+using Ship.JumpDrive;
 using World;
 using World.SpaceObjects.Asteroids;
 
@@ -92,6 +93,16 @@ public sealed class GameManagerTests
         Assert.Equal(10_000, fusionCore.CoolantTank.CapacityKilograms);
         Assert.Equal(7_600, fusionCore.CoolantTank.QuantityKilograms);
         Assert.Equal(0.92, fusionCore.CoolantTank.PurityLevel);
+
+        var jumpDrive = ship.JumpDrive;
+
+        Assert.Equal("jump-drive", jumpDrive.Id);
+        Assert.Equal("Jump Drive", jumpDrive.Label);
+        Assert.Equal(2, jumpDrive.MaximumDistanceLightYears);
+        Assert.Equal(1, jumpDrive.DeuteriumIgnitionCostKilograms);
+        Assert.Equal(5, jumpDrive.DeuteriumTravelCostKilogramsPerLightYear);
+        Assert.Equal(1, jumpDrive.TritiumIgnitionCostKilograms);
+        Assert.Equal(5, jumpDrive.TritiumTravelCostKilogramsPerLightYear);
 
         var batteryBank = ship.BatteryBank;
 
@@ -699,6 +710,163 @@ public sealed class GameManagerTests
         var envelope = await ReadSingle(eventStore);
         var clientState = Assert.IsType<ClientGameStateChangedGameEvent>(envelope.Event).State;
         Assert.Contains(clientState.Actions, action => action.Id == GameActions.LoadGame);
+    }
+
+    [Fact]
+    public async Task GetJumpQuoteAsync_calculates_ignition_and_distance_fuel_costs()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+        await StartNewGameAndReadGameId(manager, store);
+
+        var quote = await manager.GetJumpQuoteAsync("connection-1", 1.3, 1.4);
+
+        Assert.NotNull(quote);
+        Assert.Equal(0.5, quote.DistanceLightYears, precision: 10);
+        Assert.Equal(3.5, quote.DeuteriumCostKilograms, precision: 10);
+        Assert.Equal(3.5, quote.TritiumCostKilograms, precision: 10);
+        Assert.True(quote.CanAfford);
+        Assert.Equal(2, quote.OriginX);
+        Assert.Equal(2, quote.OriginY);
+    }
+
+    [Fact]
+    public void CreateQuote_uses_the_installed_jump_drive_specification()
+    {
+        var game = GameState.NewGame(Guid.NewGuid(), DateTimeOffset.UtcNow).Game!;
+        var jumpDrive = new Ship.JumpDrive.JumpDrive(
+            "test-jump-drive",
+            "Test Jump Drive",
+            maximumDistanceLightYears: 0.25,
+            deuteriumIgnitionCostKilograms: 2,
+            deuteriumTravelCostKilogramsPerLightYear: 4,
+            tritiumIgnitionCostKilograms: 3,
+            tritiumTravelCostKilogramsPerLightYear: 6);
+
+        var quote = jumpDrive.CreateQuote(
+            game.World,
+            game.Ship.FusionCore,
+            targetX: 1.2,
+            targetY: 1);
+
+        Assert.NotNull(quote);
+        Assert.Equal(2.8, quote.DeuteriumCostKilograms, precision: 10);
+        Assert.Equal(4.2, quote.TritiumCostKilograms, precision: 10);
+        Assert.Null(jumpDrive.CreateQuote(
+            game.World,
+            game.Ship.FusionCore,
+            targetX: 1.3,
+            targetY: 1));
+    }
+
+    [Fact]
+    public async Task GetJumpQuoteAsync_rejects_current_position_and_invalid_coordinates()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+        await StartNewGameAndReadGameId(manager, store);
+
+        Assert.Null(await manager.GetJumpQuoteAsync("connection-1", 1, 1));
+        Assert.Null(await manager.GetJumpQuoteAsync("connection-1", -0.1, 1));
+        Assert.Null(await manager.GetJumpQuoteAsync("connection-1", 1, double.NaN));
+    }
+
+    [Fact]
+    public async Task JumpAsync_moves_ship_spends_fuel_rebuilds_world_and_resets_scanners()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+        var gameId = await StartNewGameAndReadGameId(manager, store);
+        var initialState = ReadRequiredState(manager, gameId);
+        var initialWorld = initialState.Game!.World;
+
+        await manager.StartGravityScanAsync("connection-1");
+        await manager.StartEmScanAsync("connection-1", 0.3, 0.4);
+
+        var succeeded = await manager.JumpAsync(
+            "connection-1",
+            expectedOriginX: 2,
+            expectedOriginY: 2,
+            targetX: 1.3,
+            targetY: 1.4);
+
+        Assert.True(succeeded);
+
+        var state = ReadRequiredState(manager, gameId);
+        var game = state.Game!;
+        var jumpEvent = Assert.IsType<JumpCompletedGameEvent>((await ReadAll(store)).Last().Event);
+
+        Assert.Equal(2.3, game.World.ShipPosition.X, precision: 10);
+        Assert.Equal(2.4, game.World.ShipPosition.Y, precision: 10);
+        Assert.Equal("Deep Space", game.World.ShipPosition.Label);
+        Assert.True(game.World.CurrentTime >= initialWorld.CurrentTime);
+        Assert.NotEqual(initialWorld.LocalMap, game.World.LocalMap);
+        Assert.NotEqual(initialWorld.JumpAreaMap, game.World.JumpAreaMap);
+        Assert.Equal(82.5, game.Ship.FusionCore.DeuteriumReservoir.QuantityKilograms, precision: 10);
+        Assert.Equal(60.5, game.Ship.FusionCore.TritiumReservoir.QuantityKilograms, precision: 10);
+        Assert.Null(game.Ship.Scanners.GravityScanner.CurrentScan);
+        Assert.Null(game.Ship.Scanners.EmScanner.CurrentScan);
+        Assert.Empty(game.Ship.Scanners.EmScanner.Reports);
+        Assert.Equal(0.5, jumpEvent.DistanceLightYears, precision: 10);
+    }
+
+    [Fact]
+    public async Task JumpAsync_rejects_stale_origin_without_changing_state()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+        var gameId = await StartNewGameAndReadGameId(manager, store);
+        var initialState = ReadRequiredState(manager, gameId);
+
+        var succeeded = await manager.JumpAsync(
+            "connection-1",
+            expectedOriginX: 9,
+            expectedOriginY: 9,
+            targetX: 1.5,
+            targetY: 1);
+
+        Assert.False(succeeded);
+        Assert.Same(initialState, ReadRequiredState(manager, gameId));
+        Assert.DoesNotContain(
+            await ReadAll(store),
+            envelope => envelope.Event is JumpCompletedGameEvent);
+    }
+
+    [Fact]
+    public async Task JumpAsync_does_not_spend_fuel_when_either_reservoir_is_insufficient()
+    {
+        var store = new InMemoryGameEventStore();
+        var manager = CreateManager(store);
+        var gameId = await StartNewGameAndReadGameId(manager, store);
+
+        for (var jumpNumber = 0; jumpNumber < 7; jumpNumber++)
+        {
+            var state = ReadRequiredState(manager, gameId);
+            var origin = state.Game!.World.ShipPosition;
+
+            Assert.True(await manager.JumpAsync(
+                "connection-1",
+                origin.X,
+                origin.Y,
+                targetX: 2,
+                targetY: 2));
+        }
+
+        var depletedState = ReadRequiredState(manager, gameId);
+        var depletedGame = depletedState.Game!;
+        var quote = await manager.GetJumpQuoteAsync("connection-1", 2, 2);
+
+        Assert.NotNull(quote);
+        Assert.False(quote.CanAfford);
+        Assert.True(depletedGame.Ship.FusionCore.DeuteriumReservoir.QuantityKilograms > 0);
+        Assert.True(depletedGame.Ship.FusionCore.TritiumReservoir.QuantityKilograms > 0);
+        Assert.False(await manager.JumpAsync(
+            "connection-1",
+            depletedGame.World.ShipPosition.X,
+            depletedGame.World.ShipPosition.Y,
+            targetX: 2,
+            targetY: 2));
+        Assert.Same(depletedState, ReadRequiredState(manager, gameId));
     }
 
     private static GameManager CreateManager(

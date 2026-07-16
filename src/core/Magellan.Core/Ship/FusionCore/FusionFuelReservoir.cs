@@ -21,4 +21,20 @@ public sealed class FusionFuelReservoir
     public double QuantityKilograms { get; }
 
     public double PurityLevel { get; }
+
+    public FusionFuelReservoir Spend(double quantityKilograms)
+    {
+        if (!double.IsFinite(quantityKilograms)
+            || quantityKilograms < 0
+            || quantityKilograms > QuantityKilograms)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantityKilograms));
+        }
+
+        return new FusionFuelReservoir(
+            Fuel,
+            CapacityKilograms,
+            QuantityKilograms - quantityKilograms,
+            PurityLevel);
+    }
 }

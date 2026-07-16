@@ -18,6 +18,16 @@ public sealed class FusionCore
 
     public CoolantTank CoolantTank { get; }
 
+    public FusionCore SpendJumpFuel(
+        double deuteriumKilograms,
+        double tritiumKilograms)
+    {
+        return new FusionCore(
+            DeuteriumReservoir.Spend(deuteriumKilograms),
+            TritiumReservoir.Spend(tritiumKilograms),
+            CoolantTank);
+    }
+
     public static FusionCore StartingCore()
     {
         return new FusionCore(

@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { GamePage } from './components/GamePage'
+import { JumpTransition } from './components/JumpTransition'
 import { LandingPage } from './components/LandingPage'
 import { useGameStore } from './stores/gameStore'
 
 function App() {
+  const [jumpTransitionActive, setJumpTransitionActive] = useState(false)
   const connectionState = useGameStore((state) => state.connectionState)
   const gameState = useGameStore((state) => state.gameState)
   const tick = useGameStore((state) => state.tick)
@@ -19,6 +21,8 @@ function App() {
     (state) => state.captureEmScanReport,
   )
   const stopEmScan = useGameStore((state) => state.stopEmScan)
+  const getJumpQuote = useGameStore((state) => state.getJumpQuote)
+  const jump = useGameStore((state) => state.jump)
 
   useEffect(() => {
     void connect()
@@ -27,6 +31,18 @@ function App() {
       void disconnect()
     }
   }, [connect, disconnect])
+
+  useEffect(() => {
+    if (!jumpTransitionActive) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setJumpTransitionActive(false)
+    }, 3_000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [jumpTransitionActive])
 
   const loadActiveGame = async () => {
     if (window.confirm('Load the last save and discard unsaved progress?')) {
@@ -40,22 +56,47 @@ function App() {
     }
   }
 
+  const executeJump = async (
+    expectedOriginX: number,
+    expectedOriginY: number,
+    targetX: number,
+    targetY: number,
+  ) => {
+    const succeeded = await jump(
+      expectedOriginX,
+      expectedOriginY,
+      targetX,
+      targetY,
+    )
+
+    if (succeeded) {
+      setJumpTransitionActive(true)
+    }
+
+    return succeeded
+  }
+
   if (gameState?.screen === 'game' && gameState.game) {
     return (
-      <GamePage
-        actions={gameState.actions}
-        connectionState={connectionState}
-        game={gameState.game}
-        onLoadGame={loadActiveGame}
-        onSaveGame={saveGame}
-        onStartNewGame={startActiveGame}
-        saveStatus={saveStatus}
-        onCaptureEmScanReport={captureEmScanReport}
-        onStartEmScan={startEmScan}
-        onStartGravityScan={startGravityScan}
-        onStopEmScan={stopEmScan}
-        tick={tick}
-      />
+      <>
+        <GamePage
+          actions={gameState.actions}
+          connectionState={connectionState}
+          game={gameState.game}
+          onLoadGame={loadActiveGame}
+          onSaveGame={saveGame}
+          onStartNewGame={startActiveGame}
+          saveStatus={saveStatus}
+          onCaptureEmScanReport={captureEmScanReport}
+          onStartEmScan={startEmScan}
+          onStartGravityScan={startGravityScan}
+          onStopEmScan={stopEmScan}
+          onGetJumpQuote={getJumpQuote}
+          onJump={executeJump}
+          tick={tick}
+        />
+        {jumpTransitionActive ? <JumpTransition /> : null}
+      </>
     )
   }
 

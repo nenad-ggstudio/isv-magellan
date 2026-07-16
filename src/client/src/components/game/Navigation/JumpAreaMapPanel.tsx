@@ -6,6 +6,7 @@ import type {
   EmScanner,
   GravityScanner,
   JumpAreaMap,
+  JumpQuote,
 } from '../../../gameTypes'
 import {
   jumpAreaGridStepLightYears,
@@ -46,6 +47,8 @@ export function JumpAreaMapPanel({
   onSelectSystem,
   onStartGravityScan,
   onStopEmScan,
+  onGetJumpQuote,
+  onJump,
   selectedSystemId,
   tick,
 }: {
@@ -63,6 +66,13 @@ export function JumpAreaMapPanel({
   onSelectSystem: (systemId: string) => void
   onStartGravityScan: () => Promise<void>
   onStopEmScan: () => Promise<void>
+  onGetJumpQuote: (x: number, y: number) => Promise<JumpQuote | null>
+  onJump: (
+    expectedOriginX: number,
+    expectedOriginY: number,
+    targetX: number,
+    targetY: number,
+  ) => Promise<boolean>
   selectedSystemId: string | null
   tick: number
 }) {
@@ -71,6 +81,12 @@ export function JumpAreaMapPanel({
     visible: true,
   })
   const [emTargeting, setEmTargeting] = useState(false)
+  const [jumpTargeting, setJumpTargeting] = useState(false)
+  const [jumpQuote, setJumpQuote] = useState<JumpQuote | null>(null)
+  const [jumpQuotePending, setJumpQuotePending] = useState(false)
+  const [jumpPending, setJumpPending] = useState(false)
+  const [jumpError, setJumpError] = useState<string | null>(null)
+  const jumpQuoteRequestId = useRef(0)
   const [selectedEmReportId, setSelectedEmReportId] = useState<string | null>(
     null,
   )
@@ -92,6 +108,7 @@ export function JumpAreaMapPanel({
     scanComplete && gravityOverlayVisible ? scan.result.heatMap : null
   const emScan = emScanner.currentScan
   const emTargetingActive = emTargeting && emScan === null
+  const jumpTargetingActive = jumpTargeting && emScan === null
   const selectedEmReport = useMemo(
     () =>
       emScanner.reports.find((report) => report.id === selectedEmReportId) ??
@@ -103,6 +120,83 @@ export function JumpAreaMapPanel({
     setEmTargeting(false)
     setSelectedEmReportId(null)
     void onStartEmScan(position.x, position.y)
+  }
+
+  function startJumpTargeting() {
+    jumpQuoteRequestId.current += 1
+    setEmTargeting(false)
+    setSelectedEmReportId(null)
+    setJumpQuote(null)
+    setJumpError(null)
+    setJumpTargeting(true)
+  }
+
+  function cancelJump() {
+    jumpQuoteRequestId.current += 1
+    setJumpTargeting(false)
+    setJumpQuote(null)
+    setJumpQuotePending(false)
+    setJumpError(null)
+  }
+
+  async function handleJumpTargetMapPoint(position: MapPosition) {
+    const requestId = jumpQuoteRequestId.current + 1
+
+    jumpQuoteRequestId.current = requestId
+    setJumpTargeting(false)
+    setJumpQuote(null)
+    setJumpError(null)
+    setJumpQuotePending(true)
+
+    try {
+      const quote = await onGetJumpQuote(position.x, position.y)
+
+      if (jumpQuoteRequestId.current !== requestId) {
+        return
+      }
+
+      setJumpQuote(quote)
+      setJumpError(quote ? null : 'Choose a point away from the ship.')
+    } catch {
+      if (jumpQuoteRequestId.current === requestId) {
+        setJumpError('Unable to calculate jump cost.')
+      }
+    } finally {
+      if (jumpQuoteRequestId.current === requestId) {
+        setJumpQuotePending(false)
+      }
+    }
+  }
+
+  async function executeJump() {
+    if (!jumpQuote || !jumpQuote.canAfford || jumpPending) {
+      return
+    }
+
+    setJumpPending(true)
+    setJumpError(null)
+
+    try {
+      const succeeded = await onJump(
+        jumpQuote.originX,
+        jumpQuote.originY,
+        jumpQuote.targetX,
+        jumpQuote.targetY,
+      )
+
+      if (succeeded) {
+        setJumpQuote(null)
+        setJumpTargeting(false)
+      } else {
+        setJumpQuote(null)
+        setJumpError('Jump conditions changed. Select a new target.')
+      }
+    } catch {
+      setJumpError('Jump failed. Select a new target.')
+      setJumpQuote(null)
+    } finally {
+      setJumpPending(false)
+    }
   }
 
   return (
@@ -122,17 +216,31 @@ export function JumpAreaMapPanel({
         gridStep={jumpAreaGridStepLightYears}
         key="jump-area"
         map={map}
+        jumpTarget={
+          jumpQuote
+            ? { x: jumpQuote.targetX, y: jumpQuote.targetY }
+            : null
+        }
         majorGridStep={jumpAreaMajorGridStepLightYears}
         minimumViewSpan={jumpAreaMinimumViewLightYears}
         onTargetMapPoint={
-          emTargetingActive ? handleEmTargetMapPoint : undefined
+          jumpTargetingActive
+            ? (position) => {
+                void handleJumpTargetMapPoint(position)
+              }
+            : emTargetingActive
+              ? handleEmTargetMapPoint
+              : undefined
         }
         onSelectEmReport={setSelectedEmReportId}
         onSelectSystem={onSelectSystem}
         selectedEmReportId={selectedEmReportId}
         selectedSystemId={selectedSystemId}
         shipPosition={shipPosition}
-        targeting={emTargetingActive}
+        targeting={jumpTargetingActive || emTargetingActive}
+        targetingLabel={
+          jumpTargetingActive ? 'Choose jump target' : 'Choose EM scan target'
+        }
       />
       <StellarReadout
         elapsedMilliseconds={elapsedMilliseconds}
@@ -141,6 +249,18 @@ export function JumpAreaMapPanel({
         map={map}
         selectedSystem={selectedSystem}
       >
+        <JumpControl
+          error={jumpError}
+          jumpPending={jumpPending}
+          onCancel={cancelJump}
+          onConfirm={() => {
+            void executeJump()
+          }}
+          onStartTargeting={startJumpTargeting}
+          quote={jumpQuote}
+          quotePending={jumpQuotePending}
+          targeting={jumpTargetingActive}
+        />
         <GravityScannerControl
           gravityScanner={gravityScanner}
           onOverlayVisibleChange={(visible) =>
@@ -155,7 +275,10 @@ export function JumpAreaMapPanel({
         <EmScannerControl
           emScanner={emScanner}
           onCancelTargeting={() => setEmTargeting(false)}
-          onStartTargeting={() => setEmTargeting(true)}
+          onStartTargeting={() => {
+            cancelJump()
+            setEmTargeting(true)
+          }}
           scanActive={emScan !== null}
           targeting={emTargetingActive}
         />
@@ -172,6 +295,134 @@ export function JumpAreaMapPanel({
           scan={emScan}
         />
       ) : null}
+    </div>
+  )
+}
+
+function JumpControl({
+  error,
+  jumpPending,
+  onCancel,
+  onConfirm,
+  onStartTargeting,
+  quote,
+  quotePending,
+  targeting,
+}: {
+  error: string | null
+  jumpPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+  onStartTargeting: () => void
+  quote: JumpQuote | null
+  quotePending: boolean
+  targeting: boolean
+}) {
+  const status = jumpPending
+    ? 'Jumping'
+    : quotePending
+      ? 'Calculating'
+      : targeting
+        ? 'Select target'
+        : quote
+          ? quote.canAfford
+            ? 'Ready'
+            : 'Insufficient fuel'
+          : error
+            ? 'Unavailable'
+            : 'Standby'
+
+  return (
+    <section
+      className="grid gap-3 rounded-md border border-[#16475a] bg-[rgb(0_20_30_/_72%)] p-3"
+      aria-label="Jump drive"
+    >
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="grid min-w-0 gap-0.5">
+          <span className="text-[10px] uppercase text-[#3a8aa2]">
+            Jump Drive
+          </span>
+          <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[#dff8ff]">
+            {status}
+          </strong>
+        </div>
+        {quote ? (
+          <div className="flex shrink-0 gap-2">
+            <button
+              className="min-h-8 cursor-pointer rounded-md border border-[#2b6678] bg-transparent px-3 text-xs font-[750] uppercase text-[#9bc6d2] hover:bg-[#082a35] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00c4e8]"
+              disabled={jumpPending}
+              onClick={onCancel}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="min-h-8 cursor-pointer rounded-md border border-[#00a5c7] bg-[#00c4e8] px-3 text-xs font-[750] uppercase text-[#001014] enabled:hover:bg-[#5be3fa] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4f7f7] disabled:cursor-not-allowed disabled:border-[#26434a] disabled:bg-[#14272c] disabled:text-[#52696a]"
+              disabled={!quote.canAfford || jumpPending}
+              onClick={onConfirm}
+              type="button"
+            >
+              {jumpPending ? 'Jumping…' : 'Confirm'}
+            </button>
+          </div>
+        ) : (
+          <button
+            className={cx(
+              'min-h-8 shrink-0 cursor-pointer rounded-md border px-3 text-xs font-[750] uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4f7f7] disabled:cursor-not-allowed disabled:border-[#263235] disabled:bg-[#111718] disabled:text-[#52696a]',
+              targeting
+                ? 'border-[#2b6678] bg-transparent text-[#9bc6d2] enabled:hover:bg-[#082a35]'
+                : 'border-[#00a5c7] bg-[#00c4e8] text-[#001014] enabled:hover:bg-[#5be3fa]',
+            )}
+            disabled={quotePending}
+            onClick={targeting ? onCancel : onStartTargeting}
+            type="button"
+          >
+            {quotePending ? 'Calculating…' : targeting ? 'Cancel' : 'Jump'}
+          </button>
+        )}
+      </div>
+
+      {quote ? (
+        <dl className="grid grid-cols-3 gap-2 rounded border border-[#123542] bg-[#031016] p-2 text-[11px] tabular-nums">
+          <JumpQuoteValue
+            label="Distance"
+            value={`${quote.distanceLightYears.toFixed(3)} ly`}
+          />
+          <JumpQuoteValue
+            label="D2 Cost"
+            value={`${quote.deuteriumCostKilograms.toFixed(2)} kg`}
+          />
+          <JumpQuoteValue
+            label="T2 Cost"
+            value={`${quote.tritiumCostKilograms.toFixed(2)} kg`}
+          />
+        </dl>
+      ) : null}
+
+      {error ? (
+        <p className="m-0 text-[11px] text-[#ff8b91]" role="status">
+          {error}
+        </p>
+      ) : quote && !quote.canAfford ? (
+        <p className="m-0 text-[11px] text-[#ffb36b]" role="status">
+          Both D2 and T2 reserves must cover the quoted cost.
+        </p>
+      ) : targeting ? (
+        <p className="m-0 text-[11px] text-[#79aeba]" role="status">
+          Select any point in the Jump Area.
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
+function JumpQuoteValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid min-w-0 gap-0.5">
+      <dt className="text-[9px] uppercase text-[#3a7383]">{label}</dt>
+      <dd className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[#c8e8f0]">
+        {value}
+      </dd>
     </div>
   )
 }

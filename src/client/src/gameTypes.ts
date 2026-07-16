@@ -52,6 +52,16 @@ export type FusionCore = {
   coolantTank: CoolantTank
 }
 
+export type JumpDrive = {
+  id: 'jump-drive'
+  label: string
+  maximumDistanceLightYears: number
+  deuteriumIgnitionCostKilograms: number
+  deuteriumTravelCostKilogramsPerLightYear: number
+  tritiumIgnitionCostKilograms: number
+  tritiumTravelCostKilogramsPerLightYear: number
+}
+
 export type BatteryBank = {
   designCapacityKilowattHours: number
   maxCapacityKilowattHours: number
@@ -162,6 +172,7 @@ export type Ship = {
   fusionCore: FusionCore
   batteryBank: BatteryBank
   scanners: ShipScanners
+  jumpDrive: JumpDrive
 }
 
 export type DistanceUnit = 'lightYear' | 'kilometer'
@@ -256,6 +267,17 @@ export type JumpAreaMap = {
   distanceUnit: DistanceUnit
   systems: StellarSystem[]
   anomalies: SensorAnomaly[]
+}
+
+export type JumpQuote = {
+  originX: number
+  originY: number
+  targetX: number
+  targetY: number
+  distanceLightYears: number
+  deuteriumCostKilograms: number
+  tritiumCostKilograms: number
+  canAfford: boolean
 }
 
 export type GameWorld = {

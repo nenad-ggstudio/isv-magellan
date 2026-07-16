@@ -73,7 +73,30 @@ public static class GameStateReducer
                 ApplyToActiveGame(
                     state,
                     game => ApplyEmScanPowerDrained(game, powerDrained)),
+            JumpCompletedGameEvent jumpCompleted =>
+                ApplyToActiveGame(
+                    state,
+                    game => ApplyJumpCompleted(game, jumpCompleted)),
             _ => state ?? GameState.Bootstrap()
+        };
+    }
+
+    private static ActiveGameState ApplyJumpCompleted(
+        ActiveGameState game,
+        JumpCompletedGameEvent jumpCompleted)
+    {
+        return game with
+        {
+            World = game.World.JumpTo(
+                jumpCompleted.DestinationX,
+                jumpCompleted.DestinationY,
+                jumpCompleted.JumpedAt),
+            Ship = game.Ship
+                .WithFusionCore(
+                    game.Ship.FusionCore.SpendJumpFuel(
+                        jumpCompleted.DeuteriumCostKilograms,
+                        jumpCompleted.TritiumCostKilograms))
+                .WithScanners(ShipScanners.StartingScanners())
         };
     }
 

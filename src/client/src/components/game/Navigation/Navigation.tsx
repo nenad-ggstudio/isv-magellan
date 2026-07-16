@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import type { EmScanner, GameWorld, GravityScanner } from '../../../gameTypes'
+import type {
+  EmScanner,
+  GameWorld,
+  GravityScanner,
+  JumpQuote,
+} from '../../../gameTypes'
 import { navigationModes } from './constants'
 import { JumpAreaMapPanel } from './JumpAreaMapPanel'
 import { LocalMapPanel } from './LocalMapPanel'
@@ -20,6 +25,13 @@ type NavigationProps = {
   onStartEmScan: (x: number, y: number) => Promise<void>
   onStartGravityScan: () => Promise<void>
   onStopEmScan: () => Promise<void>
+  onGetJumpQuote: (x: number, y: number) => Promise<JumpQuote | null>
+  onJump: (
+    expectedOriginX: number,
+    expectedOriginY: number,
+    targetX: number,
+    targetY: number,
+  ) => Promise<boolean>
   tick: number
   world: GameWorld
 }
@@ -32,6 +44,8 @@ export function Navigation({
   onStartEmScan,
   onStartGravityScan,
   onStopEmScan,
+  onGetJumpQuote,
+  onJump,
   tick,
   world,
 }: NavigationProps) {
@@ -92,12 +106,15 @@ export function Navigation({
             emScanner={emScanner}
             gizmoReferenceSpan={getSectorBaseSpan(world.longRangeMap)}
             gravityScanner={gravityScanner}
+            key={`${world.shipPosition.x}:${world.shipPosition.y}`}
             map={world.jumpAreaMap}
             onCaptureEmScanReport={onCaptureEmScanReport}
             onStartEmScan={onStartEmScan}
             onSelectSystem={setSelectedSystemId}
             onStartGravityScan={onStartGravityScan}
             onStopEmScan={onStopEmScan}
+            onGetJumpQuote={onGetJumpQuote}
+            onJump={onJump}
             selectedSystemId={selectedSystemId}
             tick={tick}
           />

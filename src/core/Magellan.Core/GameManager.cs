@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Events;
 using Infrastructure;
 using Ship.Scanners;
+using Ship.JumpDrive;
 
 public sealed class GameManager(
     IGameEventBus gameEventBus,
@@ -294,6 +295,97 @@ public sealed class GameManager(
         }
     }
 
+    public async Task<JumpQuote?> GetJumpQuoteAsync(
+        string connectionId,
+        double targetX,
+        double targetY,
+        CancellationToken cancellationToken = default)
+    {
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (!TryGetGameForConnection(connectionId, out _, out var state)
+                || state?.Game is null)
+            {
+                return null;
+            }
+
+            return state.Game.Ship.JumpDrive.CreateQuote(
+                state.Game.World,
+                state.Game.Ship.FusionCore,
+                targetX,
+                targetY);
+        }
+        finally
+        {
+            stateTransitionGate.Release();
+        }
+    }
+
+    public async Task<bool> JumpAsync(
+        string connectionId,
+        double expectedOriginX,
+        double expectedOriginY,
+        double targetX,
+        double targetY,
+        CancellationToken cancellationToken = default)
+    {
+        await stateTransitionGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (!TryGetGameForConnection(connectionId, out var gameId, out var state)
+                || state?.Game is null)
+            {
+                return false;
+            }
+
+            var activeGame = state.Game;
+            var origin = activeGame.World.ShipPosition;
+
+            if (!PositionsMatch(origin.X, expectedOriginX)
+                || !PositionsMatch(origin.Y, expectedOriginY))
+            {
+                return false;
+            }
+
+            var quote = activeGame.Ship.JumpDrive.CreateQuote(
+                activeGame.World,
+                activeGame.Ship.FusionCore,
+                targetX,
+                targetY);
+
+            if (quote is null || !quote.CanAfford)
+            {
+                return false;
+            }
+
+            var map = activeGame.World.JumpAreaMap;
+            var destinationX = origin.X + targetX - (map.Width / 2);
+            var destinationY = origin.Y + targetY - (map.Height / 2);
+
+            await ApplyAndPublishGameEvent(
+                state,
+                new JumpCompletedGameEvent(
+                    gameId,
+                    DateTimeOffset.UtcNow,
+                    destinationX,
+                    destinationY,
+                    quote.DistanceLightYears,
+                    quote.DeuteriumCostKilograms,
+                    quote.TritiumCostKilograms),
+                "Jump completed.",
+                cancellationToken);
+
+            return true;
+        }
+        finally
+        {
+            stateTransitionGate.Release();
+        }
+    }
+
     public async Task ApplyTickAsync(
         Guid gameId,
         GameTick tick,
@@ -352,6 +444,11 @@ public sealed class GameManager(
     public void Disconnect(string connectionId)
     {
         DetachConnection(connectionId);
+    }
+
+    private static bool PositionsMatch(double current, double expected)
+    {
+        return double.IsFinite(expected) && Math.Abs(current - expected) <= 0.000000001;
     }
 
     public IReadOnlyList<string> GetConnectionIds(Guid gameId)
